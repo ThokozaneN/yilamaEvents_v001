@@ -1,5 +1,5 @@
 -- =============================================================================
--- YILAMA EVENTS MASTER SCHEMA v4 | 2026-03-04
+-- YILAMA EVENTS MASTER SCHEMA v5 | 2026-03-05
 -- =============================================================================
 -- This is THE definitive, single-file database schema for Yilama Events.
 -- It consolidates every migration from 01 to 81 and all subsequent patches.
@@ -477,18 +477,88 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- validate_ticket_scan
-CREATE OR REPLACE FUNCTION public.validate_ticket_scan(p_public_id uuid, p_event_id uuid, p_scanner_id uuid) RETURNS jsonb AS $$
-DECLARE v_ticket record; v_already boolean;
+-- validate_ticket_scan (v5 — Timewindow & Signature Support)
+CREATE OR REPLACE FUNCTION public.validate_ticket_scan(
+    p_ticket_public_id UUID,
+    p_event_id UUID,
+    p_scanner_id UUID,
+    p_zone TEXT DEFAULT 'general',
+    p_signature TEXT DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_ticket_data RECORD;
+    v_event_start TIMESTAMPTZ;
+    v_event_end TIMESTAMPTZ;
+    v_scan_start TIMESTAMPTZ;
+    v_scan_end TIMESTAMPTZ;
+    v_success_scans INT;
 BEGIN
-    SELECT t.id, t.status, t.event_id, tt.name as tier FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id WHERE t.public_id = p_public_id INTO v_ticket;
-    IF v_ticket.id IS NULL THEN RETURN jsonb_build_object('success', false, 'message', 'Not found'); END IF;
-    IF v_ticket.event_id != p_event_id THEN RETURN jsonb_build_object('success', false, 'message', 'Wrong event'); END IF;
-    IF EXISTS(SELECT 1 FROM ticket_checkins WHERE ticket_id = v_ticket.id AND result = 'success') THEN RETURN jsonb_build_object('success', false, 'message', 'Already used'); END IF;
-    IF v_ticket.status != 'valid' THEN RETURN jsonb_build_object('success', false, 'message', 'Invalid status'); END IF;
-    INSERT INTO ticket_checkins (ticket_id, scanner_id, event_id, result) VALUES (v_ticket.id, p_scanner_id, p_event_id, 'success');
-    UPDATE tickets SET status = 'used', updated_at = NOW() WHERE id = v_ticket.id;
-    RETURN jsonb_build_object('success', true, 'ticket', jsonb_build_object('tier', v_ticket.tier));
+    -- 0. Get Event Time Window
+    SELECT starts_at, ends_at INTO v_event_start, v_event_end
+    FROM events WHERE id = p_event_id;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Event not found', 'code', 'NOT_FOUND');
+    END IF;
+
+    -- The window: 2 hours before start, until the end (or +6 hours if no end set)
+    v_scan_start := v_event_start - INTERVAL '2 hours';
+    v_scan_end := COALESCE(v_event_end, v_event_start + INTERVAL '6 hours');
+
+    IF now() < v_scan_start THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Event has not started (scanning opens 2 hours before)', 'code', 'TOO_EARLY');
+    END IF;
+
+    IF now() > v_scan_end THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Event has ended', 'code', 'TOO_LATE');
+    END IF;
+
+    -- 1. Lookup Ticket
+    SELECT t.id, t.status, t.event_id, tt.name AS tier_name, p.name AS owner_name
+    FROM tickets t
+    LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
+    LEFT JOIN profiles p ON t.owner_user_id = p.id
+    WHERE t.public_id = p_ticket_public_id INTO v_ticket_data;
+
+    IF v_ticket_data.id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Ticket not found', 'code', 'NOT_FOUND');
+    END IF;
+
+    IF v_ticket_data.event_id != p_event_id THEN
+        INSERT INTO ticket_checkins (ticket_id, scanner_id, event_id, scan_zone, result) 
+        VALUES (v_ticket_data.id, p_scanner_id, p_event_id, p_zone, 'invalid_event');
+        RETURN jsonb_build_object('success', false, 'message', 'Ticket belongs to different event', 'code', 'WRONG_EVENT');
+    END IF;
+    
+    IF v_ticket_data.status != 'valid' THEN
+        INSERT INTO ticket_checkins (ticket_id, scanner_id, event_id, scan_zone, result) 
+        VALUES (v_ticket_data.id, p_scanner_id, p_event_id, p_zone, 'invalid_status');
+        RETURN jsonb_build_object('success', false, 'message', 'Ticket is ' || v_ticket_data.status, 'code', 'INVALID_STATUS');
+    END IF;
+
+    -- 2. Duplicate Check
+    SELECT count(*) INTO v_success_scans FROM ticket_checkins 
+    WHERE ticket_id = v_ticket_data.id AND result = 'success';
+
+    IF v_success_scans >= 1 THEN
+        INSERT INTO ticket_checkins (ticket_id, scanner_id, event_id, scan_zone, result) 
+        VALUES (v_ticket_data.id, p_scanner_id, p_event_id, p_zone, 'duplicate');
+        RETURN jsonb_build_object('success', false, 'message', 'Already used', 'code', 'DUPLICATE');
+    END IF;
+
+    -- 3. Success!
+    INSERT INTO ticket_checkins (ticket_id, scanner_id, event_id, scan_zone, result) 
+    VALUES (v_ticket_data.id, p_scanner_id, p_event_id, p_zone, 'success');
+
+    UPDATE tickets SET status = 'used', updated_at = now() WHERE id = v_ticket_data.id;
+
+    RETURN jsonb_build_object(
+        'success', true, 
+        'message', 'Valid Admission', 
+        'code', 'SUCCESS', 
+        'ticket', jsonb_build_object('tier', v_ticket_data.tier_name, 'owner', v_ticket_data.owner_name)
+    );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
@@ -500,6 +570,7 @@ DECLARE v_org uuid; v_fee_rate numeric; v_fee_amt numeric;
 BEGIN
     IF NEW.status != 'paid' OR OLD.status = 'paid' THEN RETURN NEW; END IF;
     SELECT organizer_id INTO v_org FROM events WHERE id = NEW.event_id;
+    -- Idempotency check with explicit cast (Hotfix 84)
     IF NOT EXISTS(SELECT 1 FROM financial_transactions WHERE reference_id::text = NEW.id::text AND category = 'ticket_sale') THEN
         INSERT INTO financial_transactions (wallet_user_id, type, amount, category, reference_type, reference_id, description)
         VALUES (v_org, 'credit', NEW.total_amount, 'ticket_sale', 'order', NEW.id, 'Sale ' || NEW.id);

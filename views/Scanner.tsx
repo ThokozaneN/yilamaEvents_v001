@@ -20,6 +20,8 @@ export const ScannerView: React.FC = () => {
   const [manifest, setManifest] = useState<any[]>(JSON.parse(localStorage.getItem('yilama_event_manifest') || '[]'));
   const [offlineQueue, setOfflineQueue] = useState<any[]>(JSON.parse(localStorage.getItem('yilama_offline_queue') || '[]'));
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isContinuousMode, setIsContinuousMode] = useState(localStorage.getItem('yilama_scan_continuous') === 'true');
+  const [manifestInfo, setManifestInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Real-time Stats
   const [stats, setStats] = useState({
@@ -106,6 +108,16 @@ export const ScannerView: React.FC = () => {
       setHasCamera(true);
     }
   };
+
+  // Auto-reset success screen if in continuous mode
+  useEffect(() => {
+    if ((status === 'success' || status === 'already-used') && isContinuousMode) {
+      const timer = setTimeout(() => {
+        setStatus('scanning');
+      }, 3000); // 3 seconds to show the screen before returning to scan
+      return () => clearTimeout(timer);
+    }
+  }, [status, isContinuousMode]);
 
   const fetchAssignments = async () => {
     try {
@@ -347,11 +359,13 @@ export const ScannerView: React.FC = () => {
       if (data && data.success) {
         setManifest(data.manifest);
         localStorage.setItem('yilama_event_manifest', JSON.stringify(data.manifest));
-        alert(`Manifest downloaded: ${data.manifest.length} valid tickets secured.`);
+        setManifestInfo({ message: `Manifest downloaded: ${data.manifest.length} valid tickets secured.`, type: 'success' });
+        setTimeout(() => setManifestInfo(null), 5000);
       }
     } catch (err: any) {
       logError(err, { tag: 'download_manifest_failed' });
-      alert("Failed to download manifest: " + err.message);
+      setManifestInfo({ message: "Failed: " + err.message, type: 'error' });
+      setTimeout(() => setManifestInfo(null), 5000);
     } finally {
       setIsSyncing(false);
     }
@@ -377,9 +391,11 @@ export const ScannerView: React.FC = () => {
 
       setOfflineQueue([]);
       localStorage.setItem('yilama_offline_queue', '[]');
-      alert(`Synced! ${processResult?.success_count || 0} accepted, ${processResult?.conflicts || 0} conflicts.`);
+      setManifestInfo({ message: `Synced! ${processResult?.success_count || 0} accepted, ${processResult?.conflicts || 0} conflicts.`, type: 'success' });
+      setTimeout(() => setManifestInfo(null), 5000);
     } catch (err: any) {
-      alert("Sync failed: " + err.message);
+      setManifestInfo({ message: "Sync failed: " + err.message, type: 'error' });
+      setTimeout(() => setManifestInfo(null), 5000);
     } finally {
       setIsSyncing(false);
     }
@@ -603,7 +619,14 @@ export const ScannerView: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        {manifestInfo && (
+          <div className={`mt-2 p-3 rounded-2xl animate-in fade-in slide-in-from-top-2 flex items-center gap-3 border ${manifestInfo.type === 'success' ? 'bg-green-500/20 border-green-500/30 text-green-400' : 'bg-red-500/20 border-red-500/30 text-red-400'}`}>
+            <div className={`w-2 h-2 rounded-full ${manifestInfo.type === 'success' ? 'bg-green-400' : 'bg-red-400'} animate-pulse`} />
+            <p className="text-[10px] font-black uppercase tracking-widest leading-none">{manifestInfo.message}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
           {[
             { label: 'Generated', value: stats.total, color: 'text-white' },
             { label: 'Scanned', value: isOfflineMode ? offlineQueue.length : stats.scanned, color: 'text-green-400' },
@@ -633,6 +656,18 @@ export const ScannerView: React.FC = () => {
           >
             <p className="text-[8px] font-black uppercase tracking-widest leading-none mb-1 text-white/50">{isSyncing ? 'Wait' : 'Network'}</p>
             <p className="text-sm font-black uppercase tracking-widest leading-none" >{isOfflineMode ? 'Push Sync' : 'DL Manifest'}</p>
+          </button>
+
+          <button
+            onClick={() => {
+              const next = !isContinuousMode;
+              setIsContinuousMode(next);
+              localStorage.setItem('yilama_scan_continuous', String(next));
+            }}
+            className={`p-3 backdrop-blur-md border rounded-2xl flex flex-col items-center justify-center transition-all ${isContinuousMode ? 'bg-white/20 border-white/50 text-white' : 'bg-white/5 border-white/5 text-white/30'}`}
+          >
+            <p className="text-[8px] font-black uppercase tracking-widest leading-none mb-1 opacity-50">Auto-Scan</p>
+            <p className="text-sm font-black uppercase tracking-widest leading-none" >{isContinuousMode ? 'ON' : 'OFF'}</p>
           </button>
         </div>
       </div>
