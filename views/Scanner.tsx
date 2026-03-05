@@ -111,12 +111,15 @@ export const ScannerView: React.FC = () => {
 
   // Auto-reset success screen if in continuous mode
   useEffect(() => {
+    let timer: any;
     if ((status === 'success' || status === 'already-used') && isContinuousMode) {
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setStatus('scanning');
       }, 3000); // 3 seconds to show the screen before returning to scan
-      return () => clearTimeout(timer);
     }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [status, isContinuousMode]);
 
   const fetchAssignments = async () => {
