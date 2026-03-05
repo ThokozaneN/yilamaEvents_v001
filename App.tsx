@@ -8,16 +8,39 @@ import { Toast, ToastType } from './components/Toast';
 import { TransitionOverlay } from './components/TransitionOverlay';
 import { logError } from './lib/monitoring';
 
-const HomeView = lazy(() => import('./views/Home.tsx').then(m => ({ default: m.HomeView })));
-const EventDetailView = lazy(() => import('./views/EventDetail.tsx').then(m => ({ default: m.EventDetailView })));
-const WalletView = lazy(() => import('./views/Wallet.tsx').then(m => ({ default: m.WalletView })));
-const AuthView = lazy(() => import('./views/Auth.tsx').then(m => ({ default: m.AuthView })));
-const OrganizerDashboardView = lazy(() => import('./views/OrganizerDashboard.tsx').then(m => ({ default: m.OrganizerDashboard })));
-const ScannerView = lazy(() => import('./views/Scanner.tsx').then(m => ({ default: m.ScannerView })));
-const SettingsView = lazy(() => import('./views/Settings.tsx').then(m => ({ default: m.SettingsView })));
-const ResaleMarketplaceView = lazy(() => import('./views/ResaleMarketplace.tsx').then(m => ({ default: m.ResaleMarketplaceView })));
-const ExperiencesMarketplaceView = lazy(() => import('./views/ExperiencesMarketplace.tsx').then(m => ({ default: m.ExperiencesMarketplaceView })));
-const NotificationsView = lazy(() => import('./views/Notifications.tsx').then(m => ({ default: m.NotificationsView })));
+const lazyWithRetry = (componentImport: () => Promise<any>) =>
+  lazy(async () => {
+    const pageHasAlreadyBeenForceRefreshed = JSON.parse(
+      window.sessionStorage.getItem('page-has-been-force-refreshed') || 'false'
+    );
+
+    try {
+      const component = await componentImport();
+      window.sessionStorage.setItem('page-has-been-force-refreshed', 'false');
+      return component;
+    } catch (error) {
+      if (!pageHasAlreadyBeenForceRefreshed) {
+        // A temporary error like a chunk load failure. 
+        // Refresh the page to get the latest bundle and index.html.
+        window.sessionStorage.setItem('page-has-been-force-refreshed', 'true');
+        return window.location.reload();
+      }
+
+      // The error is persistent. Rethrow it so it's handled by ErrorBoundary.
+      throw error;
+    }
+  });
+
+const HomeView = lazyWithRetry(() => import('./views/Home.tsx').then(m => ({ default: m.HomeView })));
+const EventDetailView = lazyWithRetry(() => import('./views/EventDetail.tsx').then(m => ({ default: m.EventDetailView })));
+const WalletView = lazyWithRetry(() => import('./views/Wallet.tsx').then(m => ({ default: m.WalletView })));
+const AuthView = lazyWithRetry(() => import('./views/Auth.tsx').then(m => ({ default: m.AuthView })));
+const OrganizerDashboardView = lazyWithRetry(() => import('./views/OrganizerDashboard.tsx').then(m => ({ default: m.OrganizerDashboard })));
+const ScannerView = lazyWithRetry(() => import('./views/Scanner.tsx').then(m => ({ default: m.ScannerView })));
+const SettingsView = lazyWithRetry(() => import('./views/Settings.tsx').then(m => ({ default: m.SettingsView })));
+const ResaleMarketplaceView = lazyWithRetry(() => import('./views/ResaleMarketplace.tsx').then(m => ({ default: m.ResaleMarketplaceView })));
+const ExperiencesMarketplaceView = lazyWithRetry(() => import('./views/ExperiencesMarketplace.tsx').then(m => ({ default: m.ExperiencesMarketplaceView })));
+const NotificationsView = lazyWithRetry(() => import('./views/Notifications.tsx').then(m => ({ default: m.NotificationsView })));
 
 export type ThemeType = 'light' | 'dark' | 'matte-black';
 
@@ -625,12 +648,12 @@ export default function App() {
               event={selectedEvent}
               user={user}
               onNavigateAuth={() => handleNavigate('auth')}
-              onPurchase={(qty, tierId, attendeeNames, promoCode) => handlePurchase(selectedEvent, qty, tierId, attendeeNames, promoCode)}
+              onPurchase={(qty: number, tierId: string, attendeeNames?: string[], promoCode?: string) => handlePurchase(selectedEvent, qty, tierId, attendeeNames, promoCode)}
             />
           )}
           {currentView === 'wallet' && user && <WalletView user={user} tickets={tickets} onNavigate={handleNavigate} />}
           {currentView === 'notifications' && user && <NotificationsView onNavigate={handleNavigate} onRefreshUnreadCount={fetchUnreadCount} />}
-          {currentView === 'auth' && <AuthView onLogin={(p) => { setUser(p); if (p.role === UserRole.SCANNER) handleNavigate('scanner', p); else handleNavigate(p.role === UserRole.ORGANIZER ? 'organizer' : 'home', p); }} />}
+          {currentView === 'auth' && <AuthView onLogin={(p: Profile) => { setUser(p); if (p.role === UserRole.SCANNER) handleNavigate('scanner', p); else handleNavigate(p.role === UserRole.ORGANIZER ? 'organizer' : 'home', p); }} />}
           {currentView === 'organizer' && user && (
             <OrganizerDashboardView
               user={user}
@@ -642,7 +665,7 @@ export default function App() {
               onEventDeleted={fetchEvents}
               onUpdateProfile={setUser}
               onNavigate={handleNavigate}
-              onToggleWizard={(isOpen) => setIsWizardOpen(isOpen)}
+              onToggleWizard={(isOpen: boolean) => setIsWizardOpen(isOpen)}
             />
           )}
           {currentView === 'scanner' && user && [UserRole.SCANNER, UserRole.ORGANIZER, UserRole.ADMIN].includes(user.role) && <ScannerView />}
@@ -653,7 +676,7 @@ export default function App() {
               onThemeChange={setTheme}
               onLogout={() => { supabase.auth.signOut(); setUser(null); handleNavigate('home'); }}
               onNavigate={handleNavigate}
-              onUpdateProfile={(p) => setUser(prev => prev ? { ...prev, ...p } : null)}
+              onUpdateProfile={(p: Partial<Profile>) => setUser(prev => prev ? { ...prev, ...p } : null)}
               accessibility={accessibility}
               onToggleAccessibility={toggleAccessibility}
             />
