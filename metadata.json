@@ -1,0 +1,9 @@
+{
+  "name": "Yilama Events - BETA",
+  "description": "A premium South African event ticketing platform with secure QR ticket management, organizer verification, and real-time gate scanning.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation",
+    "clipboard-read"
+  ]
+}

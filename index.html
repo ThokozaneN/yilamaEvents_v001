@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yilama Events | Premium Ticketing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --apple-bg: #FBFBFD;
+            --apple-text: #1D1D1F;
+            --apple-card-bg: #FFFFFF;
+            --apple-border: #f4f4f5;
+            --apple-card-border: #f4f4f5;
+            --apple-input-bg: #f4f4f5;
+            --apple-secondary-bg: #f4f4f5;
+            --apple-nav-bg: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Dark Theme */
+        .dark {
+            --apple-bg: #1C1C1E;
+            --apple-text: #F5F5F7;
+            --apple-card-bg: #2C2C2E;
+            --apple-border: #3A3A3C;
+            --apple-card-border: #3A3A3C;
+            --apple-input-bg: #3A3A3C;
+            --apple-secondary-bg: #2C2C2E;
+            --apple-nav-bg: rgba(44, 44, 46, 0.8);
+        }
+
+        /* Matte Black Theme */
+        .matte-black {
+            --apple-bg: #000000;
+            --apple-text: #FFFFFF;
+            --apple-card-bg: #121212;
+            --apple-border: #222222;
+            --apple-card-border: #222222;
+            --apple-input-bg: #1A1A1A;
+            --apple-secondary-bg: #121212;
+            --apple-nav-bg: rgba(18, 18, 18, 0.9);
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 500;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: var(--apple-bg);
+            color: var(--apple-text);
+            letter-spacing: -0.01em;
+            transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.3s ease;
+        }
+
+        .themed-bg {
+            background-color: var(--apple-bg) !important;
+            transition: background-color 0.4s ease;
+        }
+
+        .themed-card {
+            background-color: var(--apple-card-bg) !important;
+            transition: background-color 0.4s ease;
+        }
+
+        .themed-text {
+            color: var(--apple-text) !important;
+            transition: color 0.4s ease;
+        }
+
+        .themed-border {
+            border-color: var(--apple-border) !important;
+            transition: border-color 0.4s ease;
+        }
+
+        .themed-secondary-bg {
+            background-color: var(--apple-secondary-bg) !important;
+            transition: background-color 0.4s ease;
+        }
+
+        .themed-nav-bg {
+            background-color: var(--apple-nav-bg) !important;
+            transition: background-color 0.4s ease;
+        }
+
+        .apple-blur {
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        ::selection {
+            background-color: #000000;
+            color: #FFFFFF;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+
+            50% {
+                top: 100%;
+            }
+
+            100% {
+                top: 0;
+            }
+        }
+
+        .scanner-laser {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #ef4444, transparent);
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            animation: scan 3s infinite linear;
+            box-shadow: 0 0 15px #ef4444;
+        }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/jsx-runtime": "https://esm.sh/react@^19.2.3/jsx-runtime",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.48.1",
+    "gsap": "https://esm.sh/gsap@^3.12.5",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "qrcode.react": "https://esm.sh/qrcode.react@^4.2.0",
+    "jsqr": "https://esm.sh/jsqr@^1.4.0",
+    "@sentry/react": "https://esm.sh/@sentry/react@^8.0.0",
+    "zod": "https://esm.sh/zod@^3.24.1",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "vitest/": "https://esm.sh/vitest@^4.0.18/",
+    "@testing-library/jest-dom": "https://esm.sh/@testing-library/jest-dom@^6.9.1",
+    "vitest": "https://esm.sh/vitest@^4.0.18",
+    "@testing-library/react": "https://esm.sh/@testing-library/react@^16.3.2"
+  }
+}
+</script>
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

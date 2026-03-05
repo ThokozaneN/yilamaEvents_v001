@@ -1,0 +1,19 @@
+// Quick fix patch for abort error detection
+// Apply this change to App.tsx around line 155-160
+
+// CURRENT CODE:
+// const isAbortError = 
+//   err.name === 'AbortError' || 
+//   err.code === 'ABORT_ERR' ||
+//   err.code === 20 ||
+//   (err.message && err.message.toLowerCase().includes('abort'));
+
+// REPLACE WITH:
+const errorString = String(err).toLowerCase();
+const isAbortError = 
+  err.name === 'AbortError' || 
+  err.code === 'ABORT_ERR' ||
+  err.code === 20 ||
+  (err.message && err.message.toLowerCase().includes('abort')) ||
+  errorString.includes('aborterror') ||
+  errorString.includes('aborted');

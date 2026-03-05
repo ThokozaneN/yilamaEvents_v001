@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .themed-text {
+    @apply text-zinc-900 dark:text-white transition-colors duration-300;
+  }
+
+  .themed-bg {
+    @apply bg-white dark:bg-black transition-colors duration-300;
+  }
+
+  .themed-secondary-bg {
+    @apply bg-zinc-50 dark:bg-zinc-900 transition-colors duration-300;
+  }
+
+  .themed-border {
+    @apply border-zinc-200 dark:border-zinc-800 transition-colors duration-300;
+  }
+
+  .themed-card {
+    @apply bg-white dark:bg-black border themed-border transition-colors duration-300;
+  }
+
+  .apple-blur {
+    @apply backdrop-blur-xl bg-white/70 dark:bg-black/70 supports-[backdrop-filter]:bg-white/50 supports-[backdrop-filter]:dark:bg-black/50;
+  }
+
+  .dash-stagger>* {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: stagger-in 0.5s ease-out forwards;
+  }
+
+  .settings-stagger>* {
+    @apply opacity-0 translate-y-[10px];
+    animation: stagger-in 0.5s ease-out forwards;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@keyframes stagger-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* P-7.4: Checkout modal entrance animation (replaces GSAP) */
+@keyframes checkout-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Custom Animations */
+@keyframes shine-text {
+  to {
+    background-position: 200% center;
+  }
+}
+
+.animated-gradient-text {
+  background: linear-gradient(to right,
+      #000000 0%,
+      #666666 40%,
+      #000000 60%,
+      #000000 100%);
+  background-size: 200% auto;
+  color: #000;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine-text 3s linear infinite;
+}
+
+.dark .animated-gradient-text {
+  background: linear-gradient(to right,
+      #ffffff 0%,
+      #999999 40%,
+      #ffffff 60%,
+      #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 3D Flip Card Utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Accessibility Modes */
+body.reduced-motion * {
+  animation: none !important;
+  transition: none !important;
+}
+
+body.high-contrast {
+  filter: contrast(1.25) saturate(1.1);
+}
+
+html.large-text {
+  font-size: 110%;
+}

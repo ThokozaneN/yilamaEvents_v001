@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "lib": [
+            "deno.ns",
+            "deno.unstable",
+            "esnext"
+        ],
+        "types": [
+            "https://deno.land/x/supabase@1.8.1/mod.ts"
+        ]
+    }
+}
