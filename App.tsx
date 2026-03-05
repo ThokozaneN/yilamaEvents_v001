@@ -265,7 +265,10 @@ export default function App() {
           const fbData = (fallbackData as AppEvent[]) || [];
           setEvents(fbData);
           if (fbData.length > 0) {
-            setLastEventDate(fbData[fbData.length - 1].created_at);
+            const lastEvent = fbData[fbData.length - 1];
+            if (lastEvent?.created_at) {
+              setLastEventDate(lastEvent.created_at);
+            }
           }
           if (fbData.length < 50) {
             setHasMoreEvents(false);
@@ -298,8 +301,12 @@ export default function App() {
           .limit(50);
         if (isMounted.current) {
           const dataArr = (data as AppEvent[]) || [];
-          if (dataArr.length < 50) setHasMoreEvents(false);
-          if (dataArr.length > 0) setLastEventDate(dataArr[dataArr.length - 1].created_at);
+          if (dataArr.length > 0) {
+            const lastEvt = dataArr[dataArr.length - 1];
+            if (lastEvt?.created_at) {
+              setLastEventDate(lastEvt.created_at);
+            }
+          }
           setEvents(dataArr);
         }
       } catch (innerErr: any) {
@@ -333,7 +340,10 @@ export default function App() {
       if (isMounted.current) {
         if (newEvents.length > 0) {
           setEvents(prev => [...prev, ...newEvents]);
-          setLastEventDate(newEvents[newEvents.length - 1].created_at);
+          const lastNewEvt = newEvents[newEvents.length - 1];
+          if (lastNewEvt?.created_at) {
+            setLastEventDate(lastNewEvt.created_at);
+          }
         }
         if (newEvents.length < 50) {
           setHasMoreEvents(false);

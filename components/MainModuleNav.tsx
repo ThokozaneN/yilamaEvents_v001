@@ -14,13 +14,6 @@ export const MainModuleNav: React.FC<MainModuleNavProps> = ({ activeModule, onNa
             }`;
     };
 
-    const handleComingSoon = (name: string) => {
-        const toastContent = document.createElement('div');
-        toastContent.className = "fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] bg-black dark:bg-white text-white dark:text-black px-6 py-3 rounded-full font-bold text-xs uppercase tracking-widest shadow-2xl animate-in fade-in slide-in-from-bottom-5";
-        toastContent.textContent = `${name} coming soon`;
-        document.body.appendChild(toastContent);
-        setTimeout(() => { toastContent.classList.add('fade-out'); setTimeout(() => toastContent.remove(), 300); }, 3000);
-    };
 
     return (
         <div className="flex flex-wrap items-center gap-6 md:gap-10 pb-4 border-b border-zinc-200 dark:border-zinc-800">

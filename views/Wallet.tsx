@@ -3,6 +3,7 @@ import { Ticket, TicketStatus, TicketTransfer, Profile } from '../types';
 import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '../lib/supabase';
 import { downloadICS } from '../lib/calendar';
+import { logError } from '../lib/monitoring';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,20 +26,11 @@ const formatTime = (dateStr?: string) => {
   return new Date(dateStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 };
 
-// ─── Decorative perforation dots ─────────────────────────────────────────────
-
-const Perforation = ({ className = '' }: { className?: string }) => (
-  <div className={`flex items-center gap-[3px] ${className}`}>
-    {Array.from({ length: 22 }).map((_, i) => (
-      <div key={i} className="w-[5px] h-[5px] rounded-full bg-current opacity-20 shrink-0" />
-    ))}
-  </div>
-);
-
 // ─── Ticket Card (grouped) ────────────────────────────────────────────────────
 
 const TicketCard: React.FC<{ group: TicketGroup; onClick: (ticket: Ticket) => void }> = ({ group, onClick }) => {
   const ticket = group.tickets[0]; // representative ticket
+  if (!ticket) return null; // Defensive guard
   const hasImage = !!ticket.event?.image_url;
 
   return (
@@ -112,16 +104,18 @@ const TicketCard: React.FC<{ group: TicketGroup; onClick: (ticket: Ticket) => vo
             <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center overflow-hidden">
               <QRCodeSVG value={ticket.qr_payload || ticket.public_id || ticket.id} size={44} level="L" />
             </div>
-            <p className="text-[10px] font-mono text-center font-bold text-black dark:text-white w-14 truncate tracking-wider">{ticket.public_id?.slice(0, 8)}</p>
+            <p className="text-[10px] font-mono text-center font-bold text-black dark:text-white w-14 truncate tracking-wider">{ticket.public_id?.slice(0, 8) || 'TICKETID'}</p>
           </div>
         </div>
 
         {/* Bottom status bar */}
         <div className="px-5 pb-4 flex items-center justify-between">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-green-500">
-            {group.count > 1 ? `${group.count} × Valid` : 'Valid · Tap to view'}
-          </span>
+          <div className="absolute top-4 right-4 z-10">
+            <div className="bg-green-500/20 backdrop-blur-md px-2 py-1 rounded text-[10px] items-center gap-1.5 flex uppercase font-bold tracking-wider text-green-400">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              {ticket.status}
+            </div>
+          </div>
           <svg className="w-4 h-4 opacity-30 themed-text group-hover:opacity-70 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
           </svg>
@@ -255,6 +249,7 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
       fetchTransfers();
     } catch (err: any) {
       alert(err.message);
+      logError(err); // Log the error
     } finally {
       setIsSubmitting(false);
     }
@@ -265,14 +260,17 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
       const { error } = await supabase.rpc('respond_to_transfer', { p_transfer_id: id, p_accept: accept });
       if (error) throw error;
       fetchTransfers();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) {
+      alert(err.message);
+      logError(err); // Log the error
+    }
   };
 
   const handleShareTicket = async () => {
     if (!selectedTicket?.event) return;
     const shareData = {
-      title: `I'm going to ${selectedTicket.event.title}!`,
-      text: `I just secured my ticket for ${selectedTicket.event.title}. Get yours on Yilama Events!`,
+      title: "I'm going to " + selectedTicket.event.title + "!",
+      text: "I just secured my ticket for " + selectedTicket.event.title + ". Get yours on Yilama Events!",
       url: window.location.origin,
     };
     if (navigator.share) {
@@ -289,8 +287,8 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
       title: selectedTicket.event.title,
       description: selectedTicket.event.description || 'Yilama Event Ticket',
       location: selectedTicket.event.venue || 'TBA',
-      startTime: selectedTicket.event.starts_at || new Date().toISOString(),
-      endTime: selectedTicket.event.ends_at || new Date().toISOString(),
+      startTime: selectedTicket.event?.starts_at || new Date().toISOString(),
+      endTime: selectedTicket.event?.ends_at || new Date().toISOString(),
       url: window.location.origin,
     }, `${selectedTicket.event.title.replace(/\s+/g, '_')}_ticket.ics`);
   };
@@ -443,9 +441,14 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
           <div
             className="relative w-full max-w-sm"
             style={{ perspective: '1000px' }}
-            onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              if (touch) touchStartX.current = touch.clientX;
+            }}
             onTouchEnd={(e) => {
-              const delta = touchStartX.current - e.changedTouches[0].clientX;
+              const touch = e.changedTouches[0];
+              if (!touch) return;
+              const delta = touchStartX.current - touch.clientX;
               if (Math.abs(delta) > 50) navigate(delta > 0 ? 1 : -1);
             }}
           >
@@ -469,16 +472,18 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
               <div className="absolute inset-0 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col bg-white" style={{ backfaceVisibility: 'hidden' }}>
 
                 {/* Top image band */}
-                <div className="relative h-2/5">
-                  {selectedTicket.event?.image_url
-                    ? <img src={selectedTicket.event?.image_url} className="w-full h-full object-cover" alt="" />
-                    : <div className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-800" />
-                  }
+                <div className="relative h-48">
+                  {selectedTicket.event?.image_url ? (
+                    <img src={selectedTicket.event.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-800" />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute bottom-5 left-6 right-6">
-                    <p className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">{selectedTicket.ticket_type?.name || 'General Admission'}</p>
-                    <h2 className="text-2xl font-black text-white leading-none tracking-tight">{selectedTicket.event?.title}</h2>
-                    <p className="text-white/70 text-xs mt-1">{formatDate(selectedTicket.event?.starts_at)}</p>
+                  <div className="absolute bottom-4 left-5 right-5">
+                    <p className="text-white/60 text-[9px] font-black uppercase tracking-widest mb-1">
+                      {selectedTicket.ticket_type?.name || 'General Admission'}
+                    </p>
+                    <h4 className="text-xl font-black text-white leading-tight tracking-tight">{selectedTicket.event?.title}</h4>
                   </div>
                 </div>
 

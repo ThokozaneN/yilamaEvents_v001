@@ -115,7 +115,7 @@ export interface TicketType {
   name: string;
   price: number;
   quantity_limit: number;
-  sold_count: number;
+  quantity_sold: number;
   event_date_id?: string | null; // Null means valid for all dates
   access_rules?: TicketAccessRules;
 }
@@ -146,6 +146,7 @@ export interface Event {
   price?: number;
   layout_id?: string;
   is_seated?: boolean;
+  created_at?: string;
   organizer?: Profile;
 }
 
