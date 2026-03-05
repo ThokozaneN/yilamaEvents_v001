@@ -15,11 +15,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const PRODUCTION_ORIGIN = 'https://app.yilama.co.za';
 
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (origin === 'https://app.yilama.co.za') return true;
+  if (origin === 'https://yilama.co.za') return true;
+  if (origin.startsWith('http://localhost:')) return true;
+  if (origin.endsWith('.vercel.app')) return true;
+  return false;
+}
+
 function getAllowedOrigin(reqOrigin: string | null): string {
-  const isProduction = Deno.env.get('PAYFAST_ENVIRONMENT') === 'production';
-  if (isProduction) return PRODUCTION_ORIGIN;
-  // In non-production, echo back the request origin for local dev flexibility
-  return reqOrigin || PRODUCTION_ORIGIN;
+  if (isAllowedOrigin(reqOrigin)) return reqOrigin!;
+  return PRODUCTION_ORIGIN;
 }
 
 function corsHeaders(reqOrigin: string | null) {

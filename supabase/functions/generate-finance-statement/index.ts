@@ -9,14 +9,24 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+const isAllowedOrigin = (origin: string | null): boolean => {
+    if (!origin) return false;
+    if (origin === 'https://app.yilama.co.za') return true;
+    if (origin === 'https://yilama.co.za') return true;
+    if (origin.startsWith('http://localhost:')) return true;
+    if (origin.endsWith('.vercel.app')) return true;
+    return false;
+};
+
+const corsHeaders = (reqOrigin: string | null): Record<string, string> => ({
+    'Access-Control-Allow-Origin': isAllowedOrigin(reqOrigin) ? reqOrigin! : 'https://app.yilama.co.za',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+});
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
+        return new Response('ok', { headers: corsHeaders(req.headers.get('origin')) })
     }
 
     try {
@@ -117,13 +127,13 @@ serve(async (req) => {
         }
 
         return new Response(JSON.stringify({ url: downloadUrl }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' },
         })
 
     } catch (err: any) {
         console.error(err)
         return new Response(JSON.stringify({ error: err.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' },
             status: 400,
         })
     }

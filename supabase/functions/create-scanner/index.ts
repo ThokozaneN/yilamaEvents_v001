@@ -1,14 +1,24 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const isAllowedOrigin = (origin: string | null): boolean => {
+    if (!origin) return false;
+    if (origin === 'https://app.yilama.co.za') return true;
+    if (origin === 'https://yilama.co.za') return true;
+    if (origin.startsWith('http://localhost:')) return true;
+    if (origin.endsWith('.vercel.app')) return true;
+    return false;
 };
+
+const corsHeaders = (reqOrigin: string | null): Record<string, string> => ({
+    'Access-Control-Allow-Origin': isAllowedOrigin(reqOrigin) ? reqOrigin! : 'https://app.yilama.co.za',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+});
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+        return new Response('ok', { headers: corsHeaders(req.headers.get('origin')) });
     }
 
     try {
@@ -139,14 +149,14 @@ serve(async (req) => {
             user_id: newUserId,
             password: temporary_password
         }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' },
             status: 200,
         });
 
     } catch (error: any) {
         console.error('Create Scanner Error:', error);
         return new Response(JSON.stringify({ error: error.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' },
             status: 400,
         });
     }

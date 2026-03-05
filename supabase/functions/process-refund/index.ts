@@ -21,6 +21,15 @@ const merchantId = Deno.env.get("PAYFAST_MERCHANT_ID") ?? "";
 const payfastPassphrase = Deno.env.get("PAYFAST_PASSPHRASE") ?? "";
 const isProduction = Deno.env.get("PAYFAST_ENVIRONMENT") === "production";
 
+function isAllowedOrigin(origin: string | null): boolean {
+    if (!origin) return false;
+    if (origin === 'https://app.yilama.co.za') return true;
+    if (origin === 'https://yilama.co.za') return true;
+    if (origin.startsWith('http://localhost:')) return true;
+    if (origin.endsWith('.vercel.app')) return true;
+    return false;
+}
+
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Pure-JS MD5 — needed for PayFast signature generation in Deno
@@ -86,7 +95,7 @@ function buildPayFastApiSignature(params: Record<string, string>, passphrase: st
 
 serve(async (req) => {
     const reqOrigin = req.headers.get("origin");
-    const allowedOrigin = isProduction ? PRODUCTION_ORIGIN : (reqOrigin || PRODUCTION_ORIGIN);
+    const allowedOrigin = isAllowedOrigin(reqOrigin) ? reqOrigin! : PRODUCTION_ORIGIN;
 
     const responseHeaders = {
         "Content-Type": "application/json",

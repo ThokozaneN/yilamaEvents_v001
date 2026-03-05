@@ -12,16 +12,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * - type: 'marketing' / 'pricing' / 'sales' - Revenue engine features
  */
 
-const ALLOWED_ORIGINS = [
-    'https://app.yilama.co.za',
-    'https://yilama.co.za',
-    'http://localhost:3000',
-    'http://localhost:5173',
-];
+const isAllowedOrigin = (origin: string | null): boolean => {
+    if (!origin) return false;
+    if (origin === 'https://app.yilama.co.za') return true;
+    if (origin === 'https://yilama.co.za') return true;
+    if (origin.startsWith('http://localhost:')) return true;
+    if (origin.endsWith('.vercel.app')) return true;
+    return false;
+};
 
 const corsHeaders = (reqOrigin: string | null): Record<string, string> => ({
-    'Access-Control-Allow-Origin':
-        reqOrigin && ALLOWED_ORIGINS.includes(reqOrigin) ? reqOrigin : 'https://app.yilama.co.za',
+    'Access-Control-Allow-Origin': isAllowedOrigin(reqOrigin) ? reqOrigin! : 'https://app.yilama.co.za',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });

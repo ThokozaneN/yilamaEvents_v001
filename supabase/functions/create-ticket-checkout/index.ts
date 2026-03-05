@@ -15,16 +15,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
  *  7. `payfast-itn` calls `confirm_order_payment` to mint the tickets
  */
 
-const ALLOWED_ORIGINS = [
-    'https://app.yilama.co.za',
-    'https://yilama.co.za',
-    'http://localhost:3000',
-    'http://localhost:5173',
-];
+const isAllowedOrigin = (origin: string | null): boolean => {
+    if (!origin) return false;
+    if (origin === 'https://app.yilama.co.za') return true;
+    if (origin === 'https://yilama.co.za') return true;
+    if (origin.startsWith('http://localhost:')) return true;
+    if (origin.endsWith('.vercel.app')) return true;
+    return false;
+};
 
 const corsHeaders = (reqOrigin: string | null): Record<string, string> => ({
-    'Access-Control-Allow-Origin':
-        reqOrigin && ALLOWED_ORIGINS.includes(reqOrigin) ? reqOrigin : 'https://app.yilama.co.za',
+    'Access-Control-Allow-Origin': isAllowedOrigin(reqOrigin) ? reqOrigin! : 'https://app.yilama.co.za',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
@@ -223,7 +224,8 @@ serve(async (req: Request) => {
             throw new Error('Failed to initialise payment record. Please try again.');
         }
 
-        const origin = req.headers.get('origin') || 'https://app.yilama.co.za';
+        const currentOrigin = req.headers.get('origin') || 'https://app.yilama.co.za';
+        const redirectOrigin = isAllowedOrigin(currentOrigin) ? currentOrigin : 'https://app.yilama.co.za';
 
 
         // Build pfData in the exact order documented by PayFast.
@@ -231,8 +233,8 @@ serve(async (req: Request) => {
         const pfData: Record<string, string> = {
             merchant_id: merchantId!,
             merchant_key: merchantKey!,
-            return_url: `${origin}/tickets?order=${orderId}&payment=success`,
-            cancel_url: `${origin}/event/${eventId}?payment=cancelled`,
+            return_url: `${redirectOrigin}/tickets?order=${orderId}&payment=success`,
+            cancel_url: `${redirectOrigin}/event/${eventId}?payment=cancelled`,
 
             notify_url: `${supabaseUrl}/functions/v1/payfast-itn`,
             name_first: (profile?.name || 'Attendee').split(' ')[0],
