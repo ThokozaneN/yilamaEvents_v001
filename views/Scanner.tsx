@@ -37,11 +37,13 @@ export const ScannerView: React.FC = () => {
   const loadingRef = useRef<boolean>(loading);
   const assignmentsRef = useRef<EventScannerAssignment[]>(assignments);
   const scannerIdRef = useRef<string | null>(null);
+  const isCameraActiveRef = useRef<boolean>(false);
 
   // Sync refs with state for loop access
   useEffect(() => { statusRef.current = status; }, [status]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
   useEffect(() => { assignmentsRef.current = assignments; }, [assignments]);
+  useEffect(() => { isCameraActiveRef.current = isCameraActive; }, [isCameraActive]);
 
   useEffect(() => {
     localStorage.setItem('yilama_scanner_id', deviceId.current);
@@ -171,7 +173,10 @@ export const ScannerView: React.FC = () => {
           const end = ev.ends_at
             ? new Date(ev.ends_at)
             : new Date(start.getTime() + 6 * 60 * 60 * 1000);
-          const scanStart = new Date(start.getTime() - 3 * 60 * 60 * 1000);
+
+          // PHASE 40: Standardized Scan Window (starts_at - 2h)
+          const scanStart = new Date(start.getTime() - 2 * 60 * 60 * 1000);
+
           if (now >= scanStart && now <= end) {
             setActiveAssignment(single);
           }
@@ -198,18 +203,43 @@ export const ScannerView: React.FC = () => {
 
   const parseScannerPayload = (payload: string) => {
     if (!payload) return null;
+
+    // DELIVERABLE 2: Guaranteed Detection Log
+    console.log("QR DETECTED:", payload);
+
     let ticketId = payload.trim();
     let totp = '';
 
+    // 1. Handle Yilama Protocol (yilama://scan?t=uuid&totp=123456)
     if (payload.includes('yilama://scan')) {
       try {
         const url = new URL(payload.replace('yilama://', 'https://'));
-        ticketId = url.searchParams.get('t') || ticketId;
+        ticketId = url.searchParams.get('t') || url.searchParams.get('ticket') || ticketId;
         totp = url.searchParams.get('totp') || '';
       } catch (e) {
-        // Fallback for malformed URLs
+        console.warn("Malformed Yilama URL:", payload);
       }
     }
+    // 2. Handle HTTPS links (https://yilama.com/ticket/uuid?totp=123)
+    else if (payload.startsWith('http')) {
+      try {
+        const url = new URL(payload);
+        const pathParts = url.pathname.split('/');
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.length > 30) {
+          ticketId = lastPart;
+        }
+        totp = url.searchParams.get('totp') || '';
+      } catch (e) {
+        console.warn("Malformed HTTP URL:", payload);
+      }
+    }
+
+    // Final Sanitize: ticketId should be just the UUID part if it was a deep link
+    if (ticketId.includes('?')) {
+      ticketId = (ticketId.split('?')[0] as string);
+    }
+
     return { ticketId, totp };
   };
 
@@ -240,28 +270,26 @@ export const ScannerView: React.FC = () => {
   };
 
   const scanLoop = () => {
-    // USE REFS instead of state to avoid closure traps
+    // USE REFS for loop recursion to avoid closure traps (isCameraActiveRef)
     const currentStatus = statusRef.current;
+    const isActive = isCameraActiveRef.current;
 
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current && currentStatus === 'scanning' && !loadingRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
 
-      // Fixed scan size for jsQR efficiency
       const scanSize = 400;
       canvas.width = scanSize;
       canvas.height = scanSize;
 
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
-        // Calculate crop factor to get the center square of the video
         const vHeight = video.videoHeight;
         const vWidth = video.videoWidth;
         const size = Math.min(vWidth, vHeight);
         const sourceX = (vWidth - size) / 2;
         const sourceY = (vHeight - size) / 2;
 
-        // Draw centered square from video to our scan canvas
         ctx.drawImage(video, sourceX, sourceY, size, size, 0, 0, scanSize, scanSize);
 
         const imageData = ctx.getImageData(0, 0, scanSize, scanSize);
@@ -269,13 +297,13 @@ export const ScannerView: React.FC = () => {
           inversionAttempts: "attemptBoth",
         });
 
-        if (code) {
+        if (code && code.data) {
           validateTicket(code.data);
         }
       }
     }
 
-    if (isCameraActive) {
+    if (isActive) {
       requestRef.current = requestAnimationFrame(scanLoop);
     }
   };
@@ -304,7 +332,9 @@ export const ScannerView: React.FC = () => {
     const now = new Date();
     const start = new Date(event.starts_at);
     const end = event.ends_at ? new Date(event.ends_at) : new Date(start.getTime() + 6 * 60 * 60 * 1000);
-    const scanStart = new Date(start.getTime() - 3 * 60 * 60 * 1000);
+
+    // PHASE 40: Standardized Scan Window
+    const scanStart = new Date(start.getTime() - 2 * 60 * 60 * 1000);
 
     return now >= scanStart && now <= end;
   };
@@ -411,10 +441,14 @@ export const ScannerView: React.FC = () => {
 
     try {
       const parsed = parseScannerPayload(payload);
-      if (!parsed) return;
+      if (!parsed) {
+        console.warn("PARSING FAILED for payload:", payload);
+        return;
+      }
       const { ticketId, totp } = parsed;
 
       if (payload.startsWith('DEMO-')) {
+        console.log("DEMO MODE ACTIVE:", payload);
         await new Promise(resolve => setTimeout(resolve, 800));
         if (payload.includes('FAIL')) {
           setStatus('tampered');
@@ -428,15 +462,24 @@ export const ScannerView: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.rpc('validate_ticket_scan', {
+      // DELIVERABLE 4: Log RPC Parameters
+      const scannerId = scannerIdRef.current || (await supabase.auth.getUser()).data.user?.id;
+      const rpcParams = {
         p_ticket_public_id: ticketId,
         p_event_id: activeAssignment.event_id,
-        p_scanner_id: scannerIdRef.current || (await supabase.auth.getUser()).data.user?.id,
+        p_scanner_id: scannerId,
         p_zone: activeAssignment.gate_name || 'general',
         p_signature: totp || null
-      });
+      };
 
-      if (error) throw error;
+      console.log("CALLING VALIDATE RPC:", rpcParams);
+
+      const { data, error } = await supabase.rpc('validate_ticket_scan', rpcParams);
+
+      if (error) {
+        console.error("SCAN RPC ERROR:", error);
+        throw error;
+      }
 
       if (data.success) {
         setAttendeeInfo({ name: data.ticket?.owner || 'Attendee', type: data.ticket?.tier || 'General Access' });
