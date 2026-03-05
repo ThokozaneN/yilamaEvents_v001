@@ -33,6 +33,14 @@ export const ScannerView: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
+  const statusRef = useRef<'idle' | 'scanning' | 'success' | 'error' | 'already-used' | 'locked' | 'wrong-event' | 'tampered'>(status);
+  const loadingRef = useRef<boolean>(loading);
+  const assignmentsRef = useRef<EventScannerAssignment[]>(assignments);
+
+  // Sync refs with state for loop access
+  useEffect(() => { statusRef.current = status; }, [status]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+  useEffect(() => { assignmentsRef.current = assignments; }, [assignments]);
 
   useEffect(() => {
     localStorage.setItem('yilama_scanner_id', deviceId.current);
@@ -186,6 +194,23 @@ export const ScannerView: React.FC = () => {
     setFlashOn(false);
   }, []);
 
+  const parseScannerPayload = (payload: string) => {
+    if (!payload) return null;
+    let ticketId = payload.trim();
+    let totp = '';
+
+    if (payload.includes('yilama://scan')) {
+      try {
+        const url = new URL(payload.replace('yilama://', 'https://'));
+        ticketId = url.searchParams.get('t') || ticketId;
+        totp = url.searchParams.get('totp') || '';
+      } catch (e) {
+        // Fallback for malformed URLs
+      }
+    }
+    return { ticketId, totp };
+  };
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -213,7 +238,10 @@ export const ScannerView: React.FC = () => {
   };
 
   const scanLoop = () => {
-    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
+    // USE REFS instead of state to avoid closure traps
+    const currentStatus = statusRef.current;
+
+    if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current && currentStatus === 'scanning' && !loadingRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
 
@@ -245,9 +273,7 @@ export const ScannerView: React.FC = () => {
       }
     }
 
-    if (isCameraActive && status === 'scanning') {
-      requestRef.current = requestAnimationFrame(scanLoop);
-    } else if (isCameraActive && (status === 'success' || status === 'error' || status === 'locked' || status === 'wrong-event' || status === 'tampered' || status === 'already-used')) {
+    if (isCameraActive) {
       requestRef.current = requestAnimationFrame(scanLoop);
     }
   };
@@ -329,13 +355,9 @@ export const ScannerView: React.FC = () => {
 
   const validateTicketOffline = (payload: string) => {
     try {
-      let ticketId = payload;
-      let totp = '';
-      if (payload.startsWith('yilama://scan')) {
-        const url = new URL(payload);
-        ticketId = url.searchParams.get('t') || '';
-        totp = url.searchParams.get('totp') || '';
-      }
+      const parsed = parseScannerPayload(payload);
+      if (!parsed) return;
+      const { ticketId, totp } = parsed;
 
       const ticket = manifest.find(t => t.id === ticketId);
       if (!ticket) {
@@ -386,6 +408,10 @@ export const ScannerView: React.FC = () => {
     if (navigator.vibrate) navigator.vibrate(50);
 
     try {
+      const parsed = parseScannerPayload(payload);
+      if (!parsed) return;
+      const { ticketId } = parsed;
+
       if (payload.startsWith('DEMO-')) {
         await new Promise(resolve => setTimeout(resolve, 800));
         if (payload.includes('FAIL')) {
@@ -401,7 +427,7 @@ export const ScannerView: React.FC = () => {
       }
 
       const { data, error } = await supabase.rpc('validate_ticket_scan', {
-        p_ticket_public_id: payload.trim(),
+        p_ticket_public_id: ticketId,
         p_event_id: activeAssignment.event_id,
         p_scanner_id: (await supabase.auth.getUser()).data.user?.id,
         p_zone: activeAssignment.gate_name || 'general'
