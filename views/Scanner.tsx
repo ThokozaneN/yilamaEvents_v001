@@ -191,8 +191,8 @@ export const ScannerView: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
         }
       });
       if (videoRef.current) {
@@ -216,12 +216,25 @@ export const ScannerView: React.FC = () => {
     if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && canvasRef.current) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+
+      // Fixed scan size for jsQR efficiency
+      const scanSize = 400;
+      canvas.width = scanSize;
+      canvas.height = scanSize;
+
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Calculate crop factor to get the center square of the video
+        const vHeight = video.videoHeight;
+        const vWidth = video.videoWidth;
+        const size = Math.min(vWidth, vHeight);
+        const sourceX = (vWidth - size) / 2;
+        const sourceY = (vHeight - size) / 2;
+
+        // Draw centered square from video to our scan canvas
+        ctx.drawImage(video, sourceX, sourceY, size, size, 0, 0, scanSize, scanSize);
+
+        const imageData = ctx.getImageData(0, 0, scanSize, scanSize);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: "attemptBoth",
         });
