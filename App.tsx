@@ -95,23 +95,8 @@ export default function App() {
 
   // Also respond to OS-level dark/light changes in real time
   useEffect(() => {
-    const token = localStorage.getItem('yilama_auth_token');
-    if (token) {
-      const parts = token.split('.');
-      if (parts.length > 1) {
-        try {
-          const payload = JSON.parse(atob(parts[1]!));
-          if (payload?.exp && payload.exp < Date.now() / 1000) {
-            localStorage.removeItem('yilama_auth_token');
-            return;
-          }
-        } catch (e) {
-          console.error("Token structure error", e);
-        }
-      }
-    }
     const saved = localStorage.getItem('yilama-theme');
-    if (saved) return; // User has chosen manually — don't override
+    if (saved) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = (e: MediaQueryListEvent) => setTheme(e.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
@@ -406,28 +391,47 @@ export default function App() {
     fetchEvents();
   }, [fetchCategories, fetchEvents]);
 
-  // User Auth Check
+  // Centralized Auth State Listener
   useEffect(() => {
     isMounted.current = true;
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && isMounted.current) fetchProfile(session.user.id);
-      else if (isMounted.current) setAuthSessionChecked(true);
-    };
-    checkAuth();
 
-    // Listen for password recovery events (from email link click)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    // 1. Initial Session Check
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && isMounted.current) {
+        await fetchProfile(session.user.id);
+      } else if (isMounted.current) {
+        setAuthSessionChecked(true);
+      }
+    };
+    initSession();
+
+    // 2. Continuous Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[AUTH_AUDIT] Event: ${event}`);
+
+      if (!isMounted.current) return;
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setTickets([]);
+        setUnreadNotifications(0);
+        setAuthSessionChecked(true);
+      } else if (event === 'PASSWORD_RECOVERY') {
         setIsPasswordRecovery(true);
       }
     });
 
     return () => {
+      isMounted.current = false;
       abortControllerRef.current?.abort();
       subscription.unsubscribe();
     };
-  }, []); // Only run once on mount
+  }, [fetchProfile]);
 
   // Realtime subscription for unread notifications (replaces 60s polling)
   useEffect(() => {
@@ -491,68 +495,18 @@ export default function App() {
       showToast('Preparing secure checkout...', 'info');
 
       // 1. Audit: Ensure session exists and refresh if expired
-      console.log('[AUTH_AUDIT] Checking local session before checkout...');
-      let { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      console.log('[AUTH_AUDIT] Fetching fresh session for checkout...');
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
 
-      if (sessionErr) {
-        console.error('[AUTH_AUDIT] Error fetching session:', sessionErr);
-        throw new Error('Authentication failed. Please log in again.');
-      }
-
-      // CRITICAL FIX: Fallback to reading the token straight from localStorage if Supabase Client lost it in memory
-      if (!session) {
-        console.warn('[AUTH_AUDIT] No memory session found. Checking localStorage backup...');
-        const localSessionStr = localStorage.getItem('sb-bvjcvdnfoqmxzdflqsdp-auth-token');
-        if (localSessionStr) {
-          try {
-            const parsedLocalSession = JSON.parse(localSessionStr);
-            session = parsedLocalSession;
-            console.log('[AUTH_AUDIT] Restored session from localStorage.');
-          } catch (e) {
-            console.warn('[AUTH_AUDIT] Failed to parse localStorage session backup.');
-          }
-        }
-      }
-
-      if (!session) {
-        console.warn('[AUTH_AUDIT] No active session found. Attempting refresh...');
-        const refreshResult = await supabase.auth.refreshSession();
-        session = refreshResult.data.session;
-        if (!session) {
-          throw new Error('User not authenticated. Please log in again.');
-        }
+      if (sessionErr || !session) {
+        console.warn('[AUTH_AUDIT] Session invalid or missing:', sessionErr);
+        throw new Error('Your session has expired. Please log in again to continue.');
       }
 
       const token = session.access_token;
+      console.log(`[AUTH_AUDIT] Session verified: ${session.user.email}`);
 
-      // Check token expiration safely (fallback to implicit refresh if parsing fails)
-      let isExpired = false;
-      try {
-        const parts = token.split('.');
-        if (parts.length > 1) {
-          const payload = JSON.parse(atob(parts[1]!));
-          const exp = (payload.exp || 0) * 1000;
-          isExpired = Date.now() >= exp;
-          console.log(`[AUTH_AUDIT] Token expires at: ${new Date(exp).toISOString()} (Expired: ${isExpired})`);
-        }
-      } catch (e) {
-        console.warn('[AUTH_AUDIT] Could not parse JWT expiration locally.');
-      }
-
-      if (isExpired) {
-        console.warn('[AUTH_AUDIT] Token is expired. Refreshing implicitly...');
-        const refreshResult = await supabase.auth.refreshSession();
-        if (refreshResult.data.session) {
-          session = refreshResult.data.session;
-        } else {
-          throw new Error('Session expired. Please log in again.');
-        }
-      }
-
-      const finalToken = session.access_token;
-      console.log(`[AUTH_AUDIT] Proceeding with token: ${finalToken.substring(0, 10)}... (Length: ${finalToken.length})`);
-
-      const headers = { Authorization: `Bearer ${finalToken}` };
+      const headers = { Authorization: `Bearer ${token}` };
 
       const { data: responseBody, error: funcErr } = await supabase.functions.invoke('create-ticket-checkout', {
         headers,

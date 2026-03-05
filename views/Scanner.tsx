@@ -680,7 +680,7 @@ export const ScannerView: React.FC = () => {
         {status === 'already-used' && (
           <div className="absolute inset-0 z-40 bg-amber-500 flex flex-col items-center justify-center p-8 animate-in slide-in-from-bottom">
             <svg className="w-20 h-20 text-white mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <h2 className="text-white font-black text-2xl uppercase tracking-tighter text-center">Duplicate Ticket</h2>
+            <h2 className="text-white font-black text-2xl uppercase tracking-tighter text-center">Already Used</h2>
             <p className="text-white/80 text-sm mt-2 text-center max-w-[250px]">{attendeeInfo?.message}</p>
             <button onClick={() => setStatus('scanning')} className="absolute bottom-12 left-8 right-8 py-5 bg-black/20 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest">Back to Scanner</button>
           </div>

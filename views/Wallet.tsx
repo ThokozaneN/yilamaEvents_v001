@@ -111,9 +111,9 @@ const TicketCard: React.FC<{ group: TicketGroup; onClick: (ticket: Ticket) => vo
         {/* Bottom status bar */}
         <div className="px-5 pb-4 flex items-center justify-between">
           <div className="absolute top-4 right-4 z-10">
-            <div className="bg-green-500/20 backdrop-blur-md px-2 py-1 rounded text-[10px] items-center gap-1.5 flex uppercase font-bold tracking-wider text-green-400">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              {ticket.status}
+            <div className={`backdrop-blur-md px-2 py-1 rounded text-[10px] items-center gap-1.5 flex uppercase font-bold tracking-wider ${ticket.status === TicketStatus.USED ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${ticket.status === TicketStatus.USED ? 'bg-amber-500' : 'bg-green-500 animate-pulse'}`} />
+              {ticket.status === TicketStatus.USED ? 'Entry Proof' : ticket.status}
             </div>
           </div>
           <svg className="w-4 h-4 opacity-30 themed-text group-hover:opacity-70 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,8 +139,19 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
   const [isFlipped, setIsFlipped] = useState(false);
   const touchStartX = React.useRef<number>(0);
 
-  // All valid tickets as a flat list for navigation
-  const allValidTickets = useMemo(() => tickets.filter(t => t.status === TicketStatus.VALID), [tickets]);
+  // All valid/recently used tickets as a flat list for navigation
+  const allValidTickets = useMemo(() => {
+    const now = new Date();
+    return tickets.filter(t => {
+      if (t.status === TicketStatus.VALID) return true;
+      if (t.status === TicketStatus.USED && t.used_at) {
+        const usedTime = new Date(t.used_at).getTime();
+        const twelveHoursInMs = 12 * 60 * 60 * 1000;
+        return now.getTime() - usedTime < twelveHoursInMs;
+      }
+      return false;
+    });
+  }, [tickets]);
   const selectedTicket = selectedTicketIdx !== null ? allValidTickets[selectedTicketIdx] ?? null : null;
 
   const openTicket = useCallback((ticket: Ticket) => {
@@ -204,9 +215,19 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
     return () => document.body.classList.remove('ticket-overlay-open');
   }, [selectedTicketIdx]);
 
-  // Group valid tickets by event
+  // Group valid/recently used tickets by event
   const ticketGroups = useMemo<TicketGroup[]>(() => {
-    const valid = tickets.filter(t => t.status === TicketStatus.VALID);
+    const now = new Date();
+    const valid = tickets.filter(t => {
+      if (t.status === TicketStatus.VALID) return true;
+      if (t.status === TicketStatus.USED && t.used_at) {
+        const usedTime = new Date(t.used_at).getTime();
+        const twelveHoursInMs = 12 * 60 * 60 * 1000;
+        return now.getTime() - usedTime < twelveHoursInMs;
+      }
+      return false;
+    });
+
     const map = new Map<string, TicketGroup>();
     for (const t of valid) {
       const key = t.event_id || t.id;
@@ -518,10 +539,17 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
 
                 {/* Footer */}
                 <div className="p-5 bg-zinc-50 border-t border-zinc-100">
-                  <button onClick={() => setIsFlipped(true)} className="w-full py-3.5 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 group">
-                    <span>Manage & Details</span>
-                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
-                  </button>
+                  {selectedTicket.status === TicketStatus.USED ? (
+                    <div className="w-full py-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-600 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <span>Official Entry Proof</span>
+                    </div>
+                  ) : (
+                    <button onClick={() => setIsFlipped(true)} className="w-full py-3.5 bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 group">
+                      <span>Manage & Details</span>
+                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                    </button>
+                  )}
                 </div>
               </div>
 
