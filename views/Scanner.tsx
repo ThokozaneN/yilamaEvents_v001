@@ -563,14 +563,18 @@ export const ScannerView: React.FC = () => {
         <canvas ref={canvasRef} className="hidden" />
 
         {isCameraActive && status === 'scanning' && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-64 h-64 border-2 border-white/30 rounded-[2rem] relative overflow-hidden backdrop-blur-sm">
+          <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center">
+            {/* Darkened Overlay around the clear scan window */}
+            <div className="absolute inset-0 bg-black/40" style={{ clipPath: 'polygon(0% 0%, 0% 100%, 100% 100%, 100% 0%, 0% 0%, 50% 50%, calc(50% - 128px) calc(50% - 128px), calc(50% + 128px) calc(50% - 128px), calc(50% + 128px) calc(50% + 128px), calc(50% - 128px) calc(50% + 128px), calc(50% - 128px) calc(50% - 128px), 50% 50%)' }} />
+
+            <div className="w-64 h-64 border-2 border-white/50 rounded-[2rem] relative overflow-hidden">
               <div className="absolute w-full h-0.5 bg-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.8)] top-0 animate-[scan_2s_ease-in-out_infinite]" />
               <div className="absolute top-4 left-4 w-4 h-4 border-t-4 border-l-4 border-white rounded-tl-lg" />
               <div className="absolute top-4 right-4 w-4 h-4 border-t-4 border-r-4 border-white rounded-tr-lg" />
               <div className="absolute bottom-4 left-4 w-4 h-4 border-b-4 border-l-4 border-white rounded-bl-lg" />
               <div className="absolute bottom-4 right-4 w-4 h-4 border-b-4 border-r-4 border-white rounded-br-lg" />
             </div>
+            <p className="mt-8 text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Center Ticket Inside Frame</p>
           </div>
         )}
 
