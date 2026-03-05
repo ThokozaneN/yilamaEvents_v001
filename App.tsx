@@ -86,6 +86,17 @@ export default function App() {
     document.documentElement.classList.toggle('large-text', accessibility.largeText);
   }, [accessibility]);
 
+  // Fail-safe for Preloader
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!authSessionChecked) {
+        console.warn("[AUTH_AUDIT] Auth initialization taking too long (>8s). Forcing ready state.");
+        setAuthSessionChecked(true);
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [authSessionChecked]);
+
   // Apply theme class to <html> and persist to localStorage
   useEffect(() => {
     const isDark = theme === 'dark' || theme === 'matte-black';
@@ -211,11 +222,16 @@ export default function App() {
   const fetchProfile = useCallback(async (userId: string, isFreshSignIn = false) => {
     if (!isMounted.current) return;
     try {
+      console.log(`[AUTH_AUDIT] Fetching profile for ${userId}...`);
       const { data: { session } } = await supabase.auth.getSession();
       const { data, error } = await supabase.from('v_composite_profiles').select('*').eq('id', userId).maybeSingle();
 
       if (!isMounted.current) return;
-      if (error || !data) { setAuthSessionChecked(true); return; }
+      if (error || !data) {
+        console.warn("[AUTH_AUDIT] Profile fetch error or empty:", error);
+        setAuthSessionChecked(true);
+        return;
+      }
 
       const profile = { ...data, email_verified: !!session?.user?.email_confirmed_at } as Profile;
       setUser(profile);
@@ -397,11 +413,18 @@ export default function App() {
 
     // 1. Initial Session Check
     const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && isMounted.current) {
-        await fetchProfile(session.user.id);
-      } else if (isMounted.current) {
-        setAuthSessionChecked(true);
+      console.log("[AUTH_AUDIT] Initializing session check...");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log(`[AUTH_AUDIT] Initial session state: ${session ? 'Authenticated' : 'Anonymous'}`);
+        if (session && isMounted.current) {
+          await fetchProfile(session.user.id);
+        } else if (isMounted.current) {
+          setAuthSessionChecked(true);
+        }
+      } catch (err) {
+        console.error("[AUTH_AUDIT] initSession CRASHED:", err);
+        if (isMounted.current) setAuthSessionChecked(true);
       }
     };
     initSession();
