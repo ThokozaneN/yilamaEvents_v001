@@ -36,6 +36,7 @@ export const ScannerView: React.FC = () => {
   const statusRef = useRef<'idle' | 'scanning' | 'success' | 'error' | 'already-used' | 'locked' | 'wrong-event' | 'tampered'>(status);
   const loadingRef = useRef<boolean>(loading);
   const assignmentsRef = useRef<EventScannerAssignment[]>(assignments);
+  const scannerIdRef = useRef<string | null>(null);
 
   // Sync refs with state for loop access
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -127,6 +128,7 @@ export const ScannerView: React.FC = () => {
       let organizerAssignments: EventScannerAssignment[] = [];
 
       if (user) {
+        scannerIdRef.current = user.id;
         const { data: ownedEvents, error: ownedErr } = await supabase
           .from('events')
           .select('id, title, venue, image_url, starts_at, ends_at, status')
@@ -410,7 +412,7 @@ export const ScannerView: React.FC = () => {
     try {
       const parsed = parseScannerPayload(payload);
       if (!parsed) return;
-      const { ticketId } = parsed;
+      const { ticketId, totp } = parsed;
 
       if (payload.startsWith('DEMO-')) {
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -429,8 +431,9 @@ export const ScannerView: React.FC = () => {
       const { data, error } = await supabase.rpc('validate_ticket_scan', {
         p_ticket_public_id: ticketId,
         p_event_id: activeAssignment.event_id,
-        p_scanner_id: (await supabase.auth.getUser()).data.user?.id,
-        p_zone: activeAssignment.gate_name || 'general'
+        p_scanner_id: scannerIdRef.current || (await supabase.auth.getUser()).data.user?.id,
+        p_zone: activeAssignment.gate_name || 'general',
+        p_signature: totp || null
       });
 
       if (error) throw error;
