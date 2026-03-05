@@ -189,7 +189,11 @@ export const ScannerView: React.FC = () => {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -219,7 +223,7 @@ export const ScannerView: React.FC = () => {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: "dontInvert",
+          inversionAttempts: "attemptBoth",
         });
 
         if (code) {
@@ -549,7 +553,13 @@ export const ScannerView: React.FC = () => {
       </div>
 
       <div className="flex-1 relative overflow-hidden bg-black">
-        <video ref={videoRef} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isCameraActive ? 'opacity-100' : 'opacity-30'}`} muted playsInline />
+        <video
+          ref={videoRef}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isCameraActive ? 'opacity-100' : 'opacity-30'}`}
+          style={{ imageRendering: 'auto' }}
+          muted
+          playsInline
+        />
         <canvas ref={canvasRef} className="hidden" />
 
         {isCameraActive && status === 'scanning' && (
