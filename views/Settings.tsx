@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Profile, UserRole, Payout } from '../types';
+import { Profile, OrganizerTier, UserRole, Payout } from '../types';
 import { ThemeType } from '../App';
 import { supabase } from '../lib/supabase';
 import { Sprout, Crown } from 'lucide-react';
@@ -73,7 +72,9 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
         const nowD = new Date();
         const monthsAgo = (nowD.getFullYear() - d.getFullYear()) * 12 + (nowD.getMonth() - d.getMonth());
         const idx = 11 - monthsAgo;
-        if (idx >= 0 && idx < 12) months[idx].value += Number(o.total_amount || 0);
+        if (idx >= 0 && idx < 12 && months[idx]) {
+          months[idx].value += Number(o.total_amount || 0);
+        }
       });
 
       setGraphData(months);
@@ -121,8 +122,8 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
     if (!file) return;
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const fileName = `${user.id} -${Math.random()}.${fileExt} `;
+    const filePath = `${fileName} `;
 
     try {
       const { error: uploadError } = await supabase.storage
@@ -193,11 +194,15 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
 
     try {
       // PHASE 6 MOCK CHECKOUT START: Uses secure ledger endpoint
-      const { data, error } = await supabase.rpc('create_sandbox_subscription', { p_plan_id: newTier });
+      const { data, error } = await supabase.rpc('upgrade_organizer_tier', { p_tier: newTier as any });
       if (error) throw error;
 
       if (data?.success) {
-        if (onUpdateProfile) onUpdateProfile({ organizer_tier: newTier });
+        if (onUpdateProfile) {
+          onUpdateProfile({
+            organizer_tier: newTier === 'pro' ? OrganizerTier.PRO : OrganizerTier.PREMIUM
+          });
+        }
         alert(data.message || `Checkout Success: Upgraded to ${newTier.toUpperCase()}`);
       } else {
         throw new Error(data?.message || 'Checkout failed');
@@ -626,7 +631,7 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
                       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 relative z-10">
                         <div className="space-y-1">
                           <h3 className="text-2xl font-black uppercase tracking-tight themed-text">Revenue Overview</h3>
-                          <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] themed-text">Last 12 Months · Confirmed Orders</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest themed-text opacity-40">Revenue Growth ({['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][new Date().getMonth()]!})</p>
                         </div>
                         <div className="text-left sm:text-right">
                           <p className="text-3xl font-black themed-text tracking-tighter">R {totalRevenue.toLocaleString('en-ZA', { minimumFractionDigits: 0 })}</p>

@@ -1,5 +1,5 @@
 
-import React from 'react';
+// Static data and legal constants
 
 export const APP_NAME = "Yilama Events";
 

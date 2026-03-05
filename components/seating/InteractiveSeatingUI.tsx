@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { VenueZone, VenueSeat } from '../../types';
+import React, { useRef, useState, useEffect } from 'react';
+
 import { GeneratedLayout } from '../../lib/seatingLogic';
 
 interface InteractiveSeatingUIProps {
@@ -10,7 +10,7 @@ interface InteractiveSeatingUIProps {
     activeZoneId?: string; // for organizer "paint mode"
 }
 
-export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSeatToggle, activeZoneId }: InteractiveSeatingUIProps) {
+export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSeatToggle, activeZoneId: _activeZoneId }: InteractiveSeatingUIProps) {
     const svgRef = useRef<SVGSVGElement>(null);
     const [viewBox, setViewBox] = useState(`0 0 ${layout.svgWidth} ${layout.svgHeight}`);
 
@@ -19,11 +19,11 @@ export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSea
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
-    
+
     // Hierarchy State
     const [currentLevel, setCurrentLevel] = useState<'venue' | 'section'>('venue');
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-    
+
     // Auto-switch to seats mode if layout has no sections (e.g. Arena/Theater)
     useEffect(() => {
         if (!layout.sections || layout.sections.length === 0) {
@@ -78,9 +78,9 @@ export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSea
                 <button onClick={() => setZoom(z => Math.max(z * 0.8, 0.2))} className="w-10 h-10 bg-white dark:bg-black rounded-xl shadow-md border border-zinc-200 dark:border-zinc-800 flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors text-black dark:text-white">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" /></svg>
                 </button>
-                <button onClick={() => { 
-                    setZoom(1); 
-                    setPan({ x: 0, y: 0 }); 
+                <button onClick={() => {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
                     if (layout.sections && layout.sections.length > 0) {
                         setCurrentLevel('venue');
                         setActiveSectionId(null);
@@ -109,36 +109,32 @@ export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSea
                     {currentLevel === 'venue' && layout.sections && layout.sections.length > 0 && (
                         <g className="sections-layer">
                             {layout.sections.map(section => (
-                                <g 
-                                    key={section.id} 
+                                <g
+                                    key={section.id}
                                     className="cursor-pointer group/section transition-all hover:opacity-80"
                                     onClick={() => {
                                         setActiveSectionId(section.id);
                                         setCurrentLevel('section');
-                                        
-                                        // Auto-zoom to this section (rough bounding box calc could go here)
-                                        setZoom(2.5); // Fixed zoom for Phase 2 demo purposes
-                                        // Basic pan towards center. A true generic bounding box parser would be better, but this suffices for the template
-                                        setPan({ x: -layout.svgWidth/4, y: -layout.svgHeight/4 }); 
+                                        setZoom(2.5);
+                                        setPan({ x: -layout.svgWidth / 4, y: -layout.svgHeight / 4 });
                                     }}
                                 >
-                                    <path 
-                                        d={section.svg_path_data} 
-                                        fill={getZoneColor(section.zone_id)} 
-                                        stroke="#18181b" 
-                                        strokeWidth={4} 
+                                    <path
+                                        d={section.svg_path_data}
+                                        fill={getZoneColor(section.zone_id)}
+                                        stroke="#18181b"
+                                        strokeWidth={4}
                                         className="transition-all"
                                     />
-                                    {/* Tooltip anchor could go here based on path bounds */}
                                 </g>
                             ))}
                         </g>
                     )}
 
-                    {/* Seats (Only show if in 'section' level OR no sections exist) */}
+                    {/* Seats */}
                     {(currentLevel === 'section' || !layout.sections || layout.sections.length === 0) && layout.seats
                         .filter(s => activeSectionId ? s.section_id === activeSectionId : true)
-                        .map((seat, idx) => {
+                        .map((seat) => {
                             const isSelected = isSeatSelected(seat.id!);
                             const isAvailable = mode === 'organizer_setup' || seat.status === 'available';
                             const fillColor = isAvailable ? getZoneColor(seat.zone_id) : '#52525b';
@@ -151,17 +147,11 @@ export function InteractiveSeatingUI({ layout, mode, selectedSeatIds = [], onSea
                                     className={isAvailable ? "cursor-pointer transition-all hover:opacity-80" : "cursor-not-allowed"}
                                     onClick={() => {
                                         if (!isAvailable) return;
-                                        // In organizer mode, clicking might re-assign the zone if a zone brush is active
-                                        if (mode === 'organizer_setup' && activeZoneId) {
-                                            // A parent component will handle the state update by toggling or reassigning
-                                            onSeatToggle?.(seat.id!);
-                                        } else {
-                                            onSeatToggle?.(seat.id!);
-                                        }
+                                        onSeatToggle?.(seat.id!);
                                     }}
                                 >
                                     <circle
-                                        r={activeSectionId ? 8 : 10} // slightly smaller if deeply packed in sections
+                                        r={activeSectionId ? 8 : 10}
                                         fill={fillColor}
                                         stroke={isSelected ? '#fff' : 'none'}
                                         strokeWidth={isSelected ? 3 : 0}

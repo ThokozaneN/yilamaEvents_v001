@@ -20,7 +20,7 @@ export const VisionView: React.FC = () => {
       // ⚠️ SECURITY NOTE: Vision feature uses client-side AI for image/PDF analysis.
       // This is a security risk. RECOMMENDED: Move to Edge Function like ai-assistant
       // for production use. Requires passing base64 image data to server.
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || '' });
       const base64Data = base64.split(',')[1];
 
       const response = await ai.models.generateContent({
@@ -40,16 +40,33 @@ export const VisionView: React.FC = () => {
 
       const fullText = response.text || "Analysis unavailable.";
 
+      // 2. Direct Logic Parsing (Deterministic)
+      const newExtractedData: { date?: string, venue?: string, type?: string } = {};
+      if (fullText) {
+        const dateMatch = fullText.match(/\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/i);
+        const venueMatch = fullText.split('\n').find(l => l.toLowerCase().includes('venue') || l.toLowerCase().includes('stadium'));
+
+        newExtractedData.date = dateMatch?.[0];
+        newExtractedData.venue = venueMatch?.replace(/venue:/i, '').trim();
+      }
+
       const dataMatch = fullText.match(/DATA:\s*(.*)\s*\|\s*(.*)\s*\|\s*(.*)/i);
-      if (dataMatch) {
+      if (dataMatch && dataMatch[1] && dataMatch[2] && dataMatch[3]) {
         setExtractedData({
           date: dataMatch[1].trim(),
           venue: dataMatch[2].trim(),
           type: dataMatch[3].trim()
         });
+      } else if (Object.keys(newExtractedData).length > 0) { // Use newExtractedData if dataMatch fails
+        setExtractedData(newExtractedData);
       }
 
-      setAnalysis(fullText.split('DATA:')[0].trim());
+      const analysisParts = fullText.split('DATA:');
+      if (analysisParts[0]) {
+        setAnalysis(analysisParts[0].trim());
+      } else {
+        setAnalysis("Analysis unavailable.");
+      }
     } catch (err: any) {
       console.error("AI Analysis Error:", err);
       setError("AI analysis failed. Please try a clearer document or image.");

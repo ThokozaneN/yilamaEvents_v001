@@ -26,7 +26,7 @@ export const ResaleMarketplaceView: React.FC<{
             const { data: publicData, error: publicErr } = await supabase
                 .from('resale_listings')
                 .select(`
-          id, resale_price, original_price, status, created_at,
+          id, seller_user_id, resale_price, original_price, status, created_at,
           ticket:tickets(public_id, event_id, ticket_type:ticket_types(name))
         `)
                 .eq('status', 'active');
@@ -37,26 +37,34 @@ export const ResaleMarketplaceView: React.FC<{
             const browseable = (publicData || []).filter(l => l.seller_user_id !== user?.id);
 
             // We map the event data manually here for performance
-            const enrichedBrowse = browseable.map(l => ({
-                ...l,
-                event: events.find(e => e.id === l.ticket?.event_id)
-            })).filter(l => l.event); // Only show if we know the event
+            const enrichedBrowse = browseable.map(l => {
+                const ticket = Array.isArray(l.ticket) ? l.ticket[0] : l.ticket;
+                return {
+                    ...l,
+                    event: events.find(e => e.id === ticket?.event_id)
+                };
+            }).filter(l => l.event);
 
             setListings(enrichedBrowse);
 
             // Fetch user's own listings (including sold/cancelled history)
             if (user) {
-                const { data: myData, error: myErr } = await supabase
+                const { data, error } = await supabase
                     .from('resale_listings')
                     .select(`
-              id, resale_price, original_price, status, created_at,
-              ticket:tickets(public_id, event_id, ticket_type:ticket_types(name))
-            `)
+          *,
+          seller:profiles!seller_user_id(name, avatar_url),
+          ticket:tickets(
+            id,
+            public_id,
+            event:events(title, venue, image_url, starts_at)
+          )
+        `)
                     .eq('seller_user_id', user.id)
                     .order('created_at', { ascending: false });
 
-                if (!myErr && myData) {
-                    const enrichedMine = myData.map(l => ({
+                if (!error && data) {
+                    const enrichedMine = data.map(l => ({
                         ...l,
                         event: events.find(e => e.id === l.ticket?.event_id)
                     }));
@@ -138,7 +146,7 @@ export const ResaleMarketplaceView: React.FC<{
                     <p className="text-zinc-500 font-medium text-lg max-w-md">Secure, fan-to-fan verified ticket resale marketplace.</p>
                 </div>
 
-                <div className="flex bg-zinc-100 dark:bg-white/5 p-1 rounded-full border themed-border w-fit shrink-0 shrink-0">
+                <div className="flex bg-zinc-100 dark:bg-white/5 p-1 rounded-full border themed-border w-fit shrink-0">
                     <button onClick={() => setActiveTab('browse')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'browse' ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg' : 'themed-text opacity-50'}`}>Buy Tickets</button>
                     <button onClick={() => setActiveTab('my_listings')} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'my_listings' ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg' : 'themed-text opacity-50'}`}>My Listings</button>
                 </div>
@@ -155,37 +163,40 @@ export const ResaleMarketplaceView: React.FC<{
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {listings.map(l => (
-                                <div key={l.id} className="themed-card border themed-border rounded-[2.5rem] bg-white dark:bg-zinc-900 overflow-hidden flex flex-col hover:-translate-y-1 transition-transform shadow-lg group">
-                                    <div className="aspect-[21/9] relative overflow-hidden">
-                                        <img src={l.event?.image_url} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" alt="" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                                        <div className="absolute bottom-4 left-4">
-                                            <h3 className="text-white font-black text-xl leading-tight">{l.event?.title || 'Unknown Event'}</h3>
-                                            <p className="text-white/60 text-[9px] uppercase font-bold tracking-widest mt-1">{l.ticket?.ticket_type?.name || 'General Admission'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="p-6 flex flex-col gap-6 flex-1 justify-between">
-                                        <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Face Value</p>
-                                                <p className="font-bold text-zinc-500 line-through">R{l.original_price}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[9px] font-black uppercase tracking-widest text-blue-500 mb-1">Listed Price</p>
-                                                <p className="font-black text-2xl themed-text">R{l.resale_price}</p>
+                            {listings.map(l => {
+                                const event = l.ticket?.[0]?.event || l.event;
+                                return (
+                                    <div key={l.id} className="themed-card border themed-border rounded-[2.5rem] bg-white dark:bg-zinc-900 overflow-hidden flex flex-col hover:-translate-y-1 transition-transform shadow-lg group">
+                                        <div className="aspect-[21/9] relative overflow-hidden">
+                                            <img src={event?.image_url || 'https://picsum.photos/seed/yilama/800'} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" alt="" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                                            <div className="absolute bottom-4 left-4">
+                                                <h3 className="text-white font-black text-xl leading-tight">{event?.title || 'Unknown Event'}</h3>
+                                                <p className="text-white/60 text-[9px] uppercase font-bold tracking-widest mt-1">{(l.ticket?.[0] as any)?.ticket_type?.name || 'General Admission'}</p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleBuy(l.id)}
-                                            disabled={isProcessing}
-                                            className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[0.98] transition-transform shadow-xl disabled:opacity-50"
-                                        >
-                                            Buy Now
-                                        </button>
+                                        <div className="p-6 flex flex-col gap-6 flex-1 justify-between">
+                                            <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-zinc-400 mb-1">Face Value</p>
+                                                    <p className="font-bold text-zinc-500 line-through">R{l.original_price}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-500 mb-1">Listed Price</p>
+                                                    <p className="font-black text-2xl themed-text">R{l.resale_price}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleBuy(l.id)}
+                                                disabled={isProcessing}
+                                                className="w-full py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[0.98] transition-transform shadow-xl disabled:opacity-50"
+                                            >
+                                                {isProcessing ? 'Processing...' : 'Buy Now'}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -212,7 +223,7 @@ export const ResaleMarketplaceView: React.FC<{
                                             <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{l.status}</span>
                                         </div>
                                         <h4 className="font-black text-lg themed-text">{l.event?.title || 'Unknown Event'}</h4>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-1">Ticket: {l.ticket?.public_id.split('-')[0]}... ({l.ticket?.ticket_type?.name})</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-40 mt-1">Ticket: {l.ticket?.public_id?.split('-')[0] || 'REF'}... ({(l.ticket as any)?.ticket_type?.name || 'General Access'})</p>
                                     </div>
 
                                     <div className="flex items-center gap-4">
@@ -236,7 +247,6 @@ export const ResaleMarketplaceView: React.FC<{
                     )}
                 </div>
             )}
-
         </div>
     );
 };

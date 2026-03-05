@@ -72,7 +72,7 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         });
         if (!parsed.success) {
           const firstError = parsed.error.errors[0];
-          throw new Error(firstError.message);
+          throw new Error(firstError?.message || 'Validation failed');
         }
 
         const { data, error: signUpError } = await supabase.auth.signUp({
@@ -115,9 +115,12 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         }
       } else if (mode === 'signin') {
         // Zod validation for signin
-        const parsed = signInSchema.safeParse({ email, password });
-        if (!parsed.success) {
-          throw new Error(parsed.error.errors[0].message);
+        const result = signInSchema.safeParse({ email, password });
+        if (!result.success) {
+          const firstError = result.error.errors[0]?.message || 'Validation failed';
+          setError(firstError);
+          setLoading(false);
+          return;
         }
 
         const { data, error: signInError } = await supabase.auth.signInWithPassword({

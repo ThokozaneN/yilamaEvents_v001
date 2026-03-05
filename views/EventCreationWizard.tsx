@@ -100,12 +100,11 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
         setTicketTiers([...ticketTiers, { name: 'New Tier', price: 0, quantity_limit: 50 }]);
     };
 
-    const _removeTicketTier = (index: number) => {
+    const removeTicketTier = (tierIndex: number) => {
         if (ticketTiers.length > 1) {
-            setTicketTiers(ticketTiers.filter((_, i) => i !== index));
+            setTicketTiers(ticketTiers.filter((_, i) => i !== tierIndex));
         }
     };
-
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPolishing, setIsPolishing] = useState(false);
     const [isAnalyzingPrice, setIsAnalyzingPrice] = useState(false);
@@ -783,7 +782,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                         <div>
                                             <h4 className="font-black uppercase tracking-widest text-xs">Total Tickets</h4>
                                             <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
-                                                {ticketTiers.reduce((acc, tier) => acc + (tier.quantity_limit || 0), 0)} / {formData.total_ticket_limit || '∞'} Allocated
+                                                {ticketTiers.reduce((acc, tier) => acc + (tier.quantity_limit || 0), 0)} / {formData.total_ticket_limit || 'âˆž'} Allocated
                                             </p>
                                         </div>
                                     </div>
@@ -846,7 +845,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                 {ticketTiers.map((tier, idx) => (
                                     <div key={idx} className="p-6 md:p-8 rounded-[2rem] bg-zinc-50 dark:bg-zinc-900/50 border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all flex flex-col gap-6 group relative">
                                         <button
-                                            onClick={() => setTicketTiers(ticketTiers.filter((_, i) => i !== idx))}
+                                            onClick={() => removeTicketTier(idx)}
                                             className="absolute top-6 right-6 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/10 hover:bg-red-500/20 w-8 h-8 rounded-full flex items-center justify-center"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>

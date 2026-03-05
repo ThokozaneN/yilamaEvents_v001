@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { EventScannerAssignment, TicketStatus } from '../types';
+import { EventScannerAssignment } from '../types';
 import jsQR from 'jsqr';
 import { logError } from '../lib/monitoring';
 
@@ -12,7 +12,6 @@ export const ScannerView: React.FC = () => {
   const [attendeeInfo, setAttendeeInfo] = useState<{ name: string; type?: string; message?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [permissionError, setPermissionError] = useState<string | null>(null);
   const [flashOn, setFlashOn] = useState(false);
   const [hasCamera, setHasCamera] = useState<boolean | null>(null);
 
@@ -41,6 +40,22 @@ export const ScannerView: React.FC = () => {
     fetchAssignments();
     return () => stopCamera();
   }, []);
+
+  const fetchStats = async () => {
+    if (!activeAssignment) return;
+
+    // Phase 10: High-Performance RPC Server Counters 🚀
+    const { data, error } = await supabase
+      .rpc('get_event_scanning_stats', { p_event_id: activeAssignment.event_id });
+
+    if (data && !error) {
+      setStats({
+        total: data.total || 0,
+        scanned: data.scanned || 0,
+        remaining: data.remaining || 0
+      });
+    }
+  };
 
   // REAL-TIME STATS SUBSCRIPTION
   useEffect(() => {
@@ -71,23 +86,6 @@ export const ScannerView: React.FC = () => {
     };
   }, [activeAssignment]);
 
-  const fetchStats = async () => {
-    if (!activeAssignment) return;
-
-    // Phase 10: High-Performance RPC Server Counters 🚀
-    // Replaces downloading 10,000 JSON rows simply to count their lengths in JavaScript
-    const { data, error } = await supabase
-      .rpc('get_event_scanning_stats', { p_event_id: activeAssignment.event_id });
-
-    if (data && !error) {
-      setStats({
-        total: data.total || 0,
-        scanned: data.scanned || 0,
-        remaining: data.remaining || 0
-      });
-    }
-  };
-
   const checkCameraAvailability = async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -100,7 +98,6 @@ export const ScannerView: React.FC = () => {
 
   const fetchAssignments = async () => {
     try {
-      // RLS ensures this query returns ONLY rows where user_id = auth.uid()
       const { data: scannerRows, error: scannerErr } = await supabase
         .from('event_scanners')
         .select('*, event:events(id, title, venue, image_url, starts_at, ends_at, status)')
@@ -108,10 +105,7 @@ export const ScannerView: React.FC = () => {
 
       if (scannerErr) throw scannerErr;
 
-      // For the scanner's assigned events: keep all that haven't fully ended
-      // (pg_cron handles soft-deactivation 12 hours post-event, so is_active = true means still valid)
-      // We still do a local filter to remove any stale event data
-      const gracePeriod = new Date(Date.now() - 12 * 60 * 60 * 1000); // 12 hr post-event tolerance
+      const gracePeriod = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const activeRows = (scannerRows || []).filter((row: any) => {
         const event = row.event;
         if (!event) return false;
@@ -121,7 +115,6 @@ export const ScannerView: React.FC = () => {
         return end >= gracePeriod;
       });
 
-      // Also fetch events the current user ORGANIZES (only relevant for organizer role)
       const { data: { user } } = await supabase.auth.getUser();
       let organizerAssignments: EventScannerAssignment[] = [];
 
@@ -133,13 +126,10 @@ export const ScannerView: React.FC = () => {
           .neq('status', 'cancelled');
 
         if (!ownedErr && ownedEvents) {
-          // Show ALL upcoming and recently-ended organizer events
-          // Events are shown as greyed-out until 3 hours before start (controlled by isEventActive)
           const visibleOwned = ownedEvents.filter(ev => {
             const end = ev.ends_at
               ? new Date(ev.ends_at)
               : new Date(new Date(ev.starts_at).getTime() + 6 * 60 * 60 * 1000);
-            // Keep if event ended within the last 12 hours OR hasn't ended yet (incl. future events)
             return end >= gracePeriod;
           });
 
@@ -154,7 +144,6 @@ export const ScannerView: React.FC = () => {
         }
       }
 
-      // Merge — scanner rows take priority over organizer synthetic rows for the same event
       const scannerEventIds = new Set(activeRows.map((r: any) => r.event_id));
       const merged = [
         ...activeRows,
@@ -163,8 +152,6 @@ export const ScannerView: React.FC = () => {
 
       setAssignments(merged);
 
-      // Auto-select only if the single assignment's event is currently active (within 3-hour window)
-      // If event is not yet active, show the event list so the scanner sees it as an inactive card
       if (merged.length === 1) {
         const single = merged[0];
         const ev = single.event;
@@ -210,7 +197,6 @@ export const ScannerView: React.FC = () => {
         setIsCameraActive(true);
         setStatus('scanning');
 
-        // Wait for video to be ready before starting the loop
         videoRef.current.onloadedmetadata = () => {
           requestRef.current = requestAnimationFrame(scanLoop);
         };
@@ -242,11 +228,9 @@ export const ScannerView: React.FC = () => {
       }
     }
 
-    // Only continue loop if camera is still active and we're not waiting for an API response
     if (isCameraActive && status === 'scanning') {
       requestRef.current = requestAnimationFrame(scanLoop);
     } else if (isCameraActive && (status === 'success' || status === 'error' || status === 'locked' || status === 'wrong-event' || status === 'tampered' || status === 'already-used')) {
-      // Just pause the loop while showing the result, without stopping the camera feed entirely
       requestRef.current = requestAnimationFrame(scanLoop);
     }
   };
@@ -274,14 +258,12 @@ export const ScannerView: React.FC = () => {
     if (!event) return false;
     const now = new Date();
     const start = new Date(event.starts_at);
-    // Events become scannable 3 hours before start, until ends_at (or 6 hours after start)
     const end = event.ends_at ? new Date(event.ends_at) : new Date(start.getTime() + 6 * 60 * 60 * 1000);
     const scanStart = new Date(start.getTime() - 3 * 60 * 60 * 1000);
 
     return now >= scanStart && now <= end;
   };
 
-  // --- OFFLINE ARCHITECTURE LOGIC ---
   const downloadManifest = async (eventId: string) => {
     setIsSyncing(true);
     try {
@@ -316,7 +298,6 @@ export const ScannerView: React.FC = () => {
 
       if (queueError) throw queueError;
 
-      // Auto-trigger the processor for this example
       const { data: processResult } = await supabase.rpc('process_offline_sync_payload', { p_queue_id: queueInsert.id });
 
       setOfflineQueue([]);
@@ -330,7 +311,6 @@ export const ScannerView: React.FC = () => {
   };
 
   const validateTicketOffline = (payload: string) => {
-    // Expected Payload: yilama://scan?t=UUID&totp=123456
     try {
       let ticketId = payload;
       let totp = '';
@@ -346,23 +326,19 @@ export const ScannerView: React.FC = () => {
         return;
       }
 
-      // Check local queue for duplicate
       if (offlineQueue.find(q => q.ticket_public_id === ticketId)) {
         setAttendeeInfo({ name: "Offline Attendee", message: "Already scanned at this device" });
         setStatus('already-used');
         return;
       }
 
-      // Cryptographic TOTP Verification (Mocked logic for client side)
-      // In production, mathematically verify the HOTP/TOTP using a local library
-      const secureTotpMatch = totp.length === 6; // simplified placeholder
+      const secureTotpMatch = totp.length === 6;
 
       if (!secureTotpMatch && payload.startsWith('yilama://')) {
         setStatus('tampered');
         return;
       }
 
-      // Record Success
       const newScan = { ticket_public_id: ticketId, scanned_at: new Date().toISOString(), totp_used: totp, zone: activeAssignment?.gate_name || 'general' };
       const updatedQueue = [...offlineQueue, newScan];
       setOfflineQueue(updatedQueue);
@@ -393,7 +369,6 @@ export const ScannerView: React.FC = () => {
     if (navigator.vibrate) navigator.vibrate(50);
 
     try {
-      // PROTOTYPE/SIMULATION MODE
       if (payload.startsWith('DEMO-')) {
         await new Promise(resolve => setTimeout(resolve, 800));
         if (payload.includes('FAIL')) {
@@ -408,7 +383,6 @@ export const ScannerView: React.FC = () => {
         return;
       }
 
-      // Online RPC Call with Zones
       const { data, error } = await supabase.rpc('validate_ticket_scan', {
         p_ticket_public_id: payload.trim(),
         p_event_id: activeAssignment.event_id,
@@ -435,16 +409,16 @@ export const ScannerView: React.FC = () => {
           setStatus('tampered');
         } else if (reason === 'INVALID_ZONE') {
           setAttendeeInfo({ name: 'Restricted Area', message: data.message });
-          setStatus('wrong-event'); // re-use UI state
+          setStatus('wrong-event');
         } else if (reason === 'TOO_EARLY') {
           setAttendeeInfo({ name: 'Scan Window Closed', message: data.message });
-          setStatus('locked'); // use locked state
+          setStatus('locked');
         } else if (reason === 'TOO_LATE') {
           setAttendeeInfo({ name: 'Scan Window Closed', message: data.message });
-          setStatus('locked'); // use locked state
+          setStatus('locked');
         } else if (reason === 'COOLDOWN_ACTIVE') {
           setAttendeeInfo({ name: 'Cooldown Active', message: data.message });
-          setStatus('locked'); // re-use UI state
+          setStatus('locked');
         } else {
           setStatus('error');
         }
@@ -458,7 +432,6 @@ export const ScannerView: React.FC = () => {
     }
   }, [loading, activeAssignment, isOfflineMode, manifest, offlineQueue]);
 
-  // -- RENDER: EVENT SELECTION --
   if (!activeAssignment) {
     return (
       <div className="px-6 py-12 max-w-2xl mx-auto space-y-12 animate-in fade-in pb-32">
@@ -487,7 +460,7 @@ export const ScannerView: React.FC = () => {
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-black opacity-50" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
                 </div>
 
                 <div className="absolute inset-0 p-8 flex flex-col justify-between">
@@ -519,10 +492,8 @@ export const ScannerView: React.FC = () => {
     );
   }
 
-  // -- RENDER: ACTIVE SCANNER --
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header / Stats */}
       <div className="absolute top-0 left-0 right-0 z-30 p-6 pt-12 flex flex-col gap-4 bg-gradient-to-b from-black/90 to-transparent">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
@@ -543,8 +514,7 @@ export const ScannerView: React.FC = () => {
           )}
         </div>
 
-        {/* LIVE STATS BAR */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {[
             { label: 'Generated', value: stats.total, color: 'text-white' },
             { label: 'Scanned', value: isOfflineMode ? offlineQueue.length : stats.scanned, color: 'text-green-400' },
@@ -578,12 +548,10 @@ export const ScannerView: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Viewport */}
       <div className="flex-1 relative overflow-hidden bg-black">
         <video ref={videoRef} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${isCameraActive ? 'opacity-100' : 'opacity-30'}`} muted playsInline />
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Viewfinder Overlay */}
         {isCameraActive && status === 'scanning' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-64 h-64 border-2 border-white/30 rounded-[2rem] relative overflow-hidden backdrop-blur-sm">
@@ -596,7 +564,6 @@ export const ScannerView: React.FC = () => {
           </div>
         )}
 
-        {/* Results */}
         {status === 'success' && (
           <div className="absolute inset-0 z-40 bg-green-500 flex flex-col items-center justify-center p-8 animate-in zoom-in-95">
             <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-green-500 mb-6 shadow-2xl">

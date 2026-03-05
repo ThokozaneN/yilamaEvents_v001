@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Event, Ticket, UserRole, Profile, EventCategory, FinancialSummary } from '../types';
 import { CheckCircle2, XCircle, Sparkles, Rocket, DollarSign, LineChart, Landmark, RefreshCw, Lock } from 'lucide-react';
@@ -20,7 +20,9 @@ interface OrganizerDashboardProps {
   onToggleWizard?: (isOpen: boolean) => void;
 }
 
-export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initialTickets, categories, onEventCreated, onEventUpdated, onEventDeleted, onUpdateProfile: _onUpdateProfile, onNavigate, onToggleWizard }: OrganizerDashboardProps) => {
+export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => {
+  const { user, events: initialEvents, tickets: initialTickets, categories, onEventCreated, onEventUpdated: _onEventUpdated, onEventDeleted: _onEventDeleted, onUpdateProfile: _onUpdateProfile, onNavigate, onToggleWizard } = props;
+  if (!user) return null;
   const profile = user;
   const [events, setEvents] = useState<Event[]>(initialEvents || []);
   const [eventViewTab, setEventViewTab] = useState<'active' | 'past'>('active');
@@ -225,7 +227,6 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
             : event
         )
       );
-
       setAiMessage({ text: `Revenue updated for event`, type: 'success' });
     } catch (err) {
       console.error("Error refreshing revenue:", err);
@@ -288,16 +289,7 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
     }
   }
 
-  async function _handleLaunchComingSoon(eventId: string) {
-    try {
-      const { error } = await supabase.from('events').update({ status: 'published' }).eq('id', eventId);
-      if (error) throw error;
-      setAiMessage({ text: 'Event Launched! Waitlist notifications have been sent.', type: 'info' });
-      loadDashboardData();
-    } catch (err: any) {
-      setAiMessage({ text: `Failed to launch: ${err.message} `, type: 'error' });
-    }
-  }
+
 
   const handleDownloadStatement = async () => {
     if (!user) return;
@@ -424,7 +416,8 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
     }
   }
 
-  async function handleRevokeScanner(scannerId: string, profileUserId: string) {
+  async function handleRevokeScanner(scannerId: string) {
+    if (!profile) return;
     if (!confirm('Are you sure you want to revoke access? They will no longer be able to scan tickets.')) return;
     try {
       const { error } = await supabase
@@ -630,7 +623,7 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                       </svg>
                     </div>
-                    {usage && usage.events_limit > 0 && (
+                    {usage && (usage.events_limit > 0) && (
                       <span className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">
                         {Math.round((usage.events_current / usage.events_limit) * 100)}% Cap
                       </span>
@@ -837,8 +830,8 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
                           <td colSpan={5} className="py-8 text-center text-sm font-bold opacity-40 themed-text">No financial data available yet.</td>
                         </tr>
                       ) : (
-                        analyticsData.revenue.map((rev, i) => (
-                          <tr key={i} className="border-b themed-border hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+                        analyticsData.revenue.map((rev, _i) => (
+                          <tr key={_i} className="border-b themed-border hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
                             <td className="py-4 px-4 font-bold themed-text">{rev.event_title}</td>
                             <td className="py-4 px-4 text-right font-bold text-green-600 dark:text-green-400">R {Number(rev.gross_revenue).toLocaleString()}</td>
                             <td className="py-4 px-4 text-right font-bold text-red-500">- R {Number(rev.total_fees).toLocaleString()}</td>
@@ -1182,7 +1175,7 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
                             </div>
 
                             <button
-                              onClick={() => handleRevokeScanner(s.id, s.profiles.id)}
+                              onClick={() => handleRevokeScanner(s.id)}
                               className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm active:scale-95"
                             >
                               Revoke
@@ -1429,6 +1422,6 @@ export const OrganizerDashboard = ({ user, events: initialEvents, tickets: initi
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
       />
-    </div >
+    </div>
   );
-}
+};

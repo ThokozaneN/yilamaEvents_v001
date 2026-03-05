@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Profile } from '../types';
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Sprout, Crown } from 'lucide-react';
 
 interface SubscriptionModalProps {

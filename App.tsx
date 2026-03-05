@@ -72,6 +72,21 @@ export default function App() {
 
   // Also respond to OS-level dark/light changes in real time
   useEffect(() => {
+    const token = localStorage.getItem('yilama_auth_token');
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length > 1) {
+        try {
+          const payload = JSON.parse(atob(parts[1]!));
+          if (payload?.exp && payload.exp < Date.now() / 1000) {
+            localStorage.removeItem('yilama_auth_token');
+            return;
+          }
+        } catch (e) {
+          console.error("Token structure error", e);
+        }
+      }
+    }
     const saved = localStorage.getItem('yilama-theme');
     if (saved) return; // User has chosen manually — don't override
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -490,10 +505,13 @@ export default function App() {
       // Check token expiration safely (fallback to implicit refresh if parsing fails)
       let isExpired = false;
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const exp = payload.exp * 1000;
-        isExpired = Date.now() >= exp;
-        console.log(`[AUTH_AUDIT] Token expires at: ${new Date(exp).toISOString()} (Expired: ${isExpired})`);
+        const parts = token.split('.');
+        if (parts.length > 1) {
+          const payload = JSON.parse(atob(parts[1]!));
+          const exp = (payload.exp || 0) * 1000;
+          isExpired = Date.now() >= exp;
+          console.log(`[AUTH_AUDIT] Token expires at: ${new Date(exp).toISOString()} (Expired: ${isExpired})`);
+        }
       } catch (e) {
         console.warn('[AUTH_AUDIT] Could not parse JWT expiration locally.');
       }
