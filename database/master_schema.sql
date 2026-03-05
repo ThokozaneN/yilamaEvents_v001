@@ -515,6 +515,37 @@ END; $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE TRIGGER tr_ledger_on_paid AFTER UPDATE OF status ON orders FOR EACH ROW EXECUTE FUNCTION ledger_on_order_paid();
 
+-- TICKET NOTIFICATIONS
+CREATE OR REPLACE FUNCTION notify_on_ticket_purchase()
+RETURNS TRIGGER AS $$
+DECLARE v_event_title TEXT;
+BEGIN
+    IF NEW.status = 'valid' AND (TG_OP = 'INSERT' OR OLD.status != 'valid') THEN
+        SELECT title INTO v_event_title FROM public.events WHERE id = NEW.event_id;
+        INSERT INTO public.app_notifications (user_id, title, body, type, action_url)
+        VALUES (NEW.owner_user_id, 'Ticket Confirmed 🎟️', 'You successfully purchased a ticket for ' || coalesce(v_event_title, 'an event') || '. Check your wallet!', 'ticket_purchase', '/wallet');
+    END IF;
+    RETURN NEW;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trigger_notify_ticket_purchase AFTER INSERT OR UPDATE OF status ON public.tickets FOR EACH ROW EXECUTE FUNCTION notify_on_ticket_purchase();
+
+-- TICKET EMAIL WEBHOOK
+CREATE OR REPLACE FUNCTION execute_ticket_email_webhook()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_payload jsonb; v_url text; v_webhook_secret text;
+BEGIN
+  v_url := COALESCE(current_setting('app.settings.supabase_url', true), 'https://bvjcvdnfoqmxzdflqsdp.supabase.co') || '/functions/v1/send-ticket-email';
+  v_payload := jsonb_build_object('type', TG_OP, 'table', TG_TABLE_NAME, 'schema', TG_TABLE_SCHEMA, 'record', row_to_json(NEW), 'old_record', row_to_json(OLD));
+  BEGIN
+    SELECT decrypted_secret INTO v_webhook_secret FROM vault.decrypted_secrets WHERE name = 'webhook_secret' LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN v_webhook_secret := NULL; END;
+  PERFORM net.http_post(url := v_url, headers := jsonb_build_object('Content-Type', 'application/json', 'x-webhook-secret', COALESCE(v_webhook_secret, '')), body := v_payload);
+  RETURN NEW;
+END; $$;
+
+CREATE TRIGGER tr_send_ticket_email AFTER UPDATE OF status ON orders FOR EACH ROW WHEN (NEW.status = 'paid' AND OLD.status != 'paid') EXECUTE FUNCTION execute_ticket_email_webhook();
+
 -- ─── PART 11: SEED DATA ────────────────────────────────────────────────────
 
 INSERT INTO plans (id, name, price, events_limit, tickets_limit, ticket_types_limit, scanners_limit, commission_rate, ai_features, seating_map) VALUES 
