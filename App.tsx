@@ -130,7 +130,11 @@ export default function App() {
     const activeUser = forceUser || user;
 
     // Check auth for protected routes first
-    if (!activeUser && view !== 'home' && view !== 'eventDetail' && view !== 'auth' && view !== 'resale' && view !== 'experiences') {
+    const isPaymentSuccess = new URLSearchParams(window.location.search).get('payment') === 'success';
+    const publicViews = ['home', 'eventDetail', 'auth', 'resale', 'experiences'];
+    if (isPaymentSuccess) publicViews.push('wallet');
+
+    if (!activeUser && !publicViews.includes(view)) {
       setCurrentView('auth');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -661,7 +665,7 @@ export default function App() {
               onPurchase={(qty: number, tierId: string, attendeeNames?: string[], promoCode?: string) => handlePurchase(selectedEvent, qty, tierId, attendeeNames, promoCode)}
             />
           )}
-          {currentView === 'wallet' && user && <WalletView user={user} tickets={tickets} onNavigate={handleNavigate} />}
+          {currentView === 'wallet' && (user ? <WalletView user={user} tickets={tickets} onNavigate={handleNavigate} /> : <ViewLoader />)}
           {currentView === 'notifications' && user && <NotificationsView onNavigate={handleNavigate} onRefreshUnreadCount={fetchUnreadCount} />}
           {currentView === 'auth' && <AuthView onLogin={(p: Profile) => { setUser(p); if (p.role === UserRole.SCANNER) handleNavigate('scanner', p); else handleNavigate(p.role === UserRole.ORGANIZER ? 'organizer' : 'home', p); }} />}
           {currentView === 'organizer' && user && (
