@@ -293,16 +293,16 @@ serve(async (req: Request) => {
             headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' }
         });
 
-    } catch (err) {
-        // Surface the real error message regardless of error type
-        const msg = err instanceof Error
-            ? err.message
-            : (err as any)?.message || (err as any)?.details || JSON.stringify(err) || 'Unexpected error';
-        console.error('[TICKET_CHECKOUT]', msg);
-        return new Response(JSON.stringify({ error: msg }), {
+    } catch (err: any) {
+        // Surface the real error message in the 'error' field for supabase-js visibility
+        const msg = err?.message || err?.details || JSON.stringify(err) || 'Unexpected error';
+        console.error('[TICKET_CHECKOUT] Error:', msg);
+
+        return new Response(JSON.stringify({
+            error: `Checkout Failed: ${msg}`
+        }), {
             status: 400,
             headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' }
         });
     }
-
 })

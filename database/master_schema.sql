@@ -25,6 +25,10 @@ DO $$ BEGIN
     CREATE TYPE ticket_status AS ENUM ('reserved', 'valid', 'used', 'refunded', 'cancelled', 'expired');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+    CREATE TYPE seat_status AS ENUM ('available', 'reserved', 'sold', 'blocked');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- ─── PART 2: IDENTITY & SUBSCRIPTIONS ───────────────────────────────────────
 
 -- PROFILES
@@ -163,6 +167,10 @@ CREATE TABLE IF NOT EXISTS public.events (
     total_ticket_limit int DEFAULT 0,
     fee_preference text DEFAULT 'post_event' CHECK (fee_preference IN ('upfront', 'post_event')),
     
+    -- Seating
+    layout_id uuid, -- references venue_layouts(id)
+    is_seated boolean DEFAULT false,
+
     -- Rich Fields
     cooler_box_price numeric(10,2) DEFAULT 0,
     headliners text[],
@@ -199,6 +207,7 @@ CREATE TABLE IF NOT EXISTS public.tickets (
     event_id uuid REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
     owner_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
     ticket_type_id uuid REFERENCES public.ticket_types(id) ON DELETE RESTRICT,
+    seat_id uuid, -- references venue_seats(id)
     
     status ticket_status DEFAULT 'reserved',
     price numeric(10,2) DEFAULT 0.00,
@@ -321,7 +330,8 @@ CREATE TABLE IF NOT EXISTS public.venue_seats (
     label text NOT NULL,
     x int NOT NULL,
     y int NOT NULL,
-    status text DEFAULT 'available', -- available, reserved, sold, blocked
+    status seat_status DEFAULT 'available',
+    event_id uuid REFERENCES public.events(id) ON DELETE CASCADE,
     created_at timestamptz DEFAULT NOW()
 );
 
@@ -453,23 +463,71 @@ CREATE POLICY "Users manage own storage" ON storage.objects FOR ALL USING (auth.
 
 -- ─── PART 9: CORE BUSINESS RPCs ────────────────────────────────────────────
 
--- purchase_tickets (v3 Security Hardened)
+-- purchase_tickets (v5 — Atomic Seating & User ID support)
 CREATE OR REPLACE FUNCTION public.purchase_tickets(
     p_event_id uuid, p_ticket_type_id uuid, p_quantity int, p_attendee_names text[], 
     p_buyer_email text, p_buyer_name text, p_promo_code text DEFAULT NULL, 
     p_user_id uuid DEFAULT NULL, p_seat_ids uuid[] DEFAULT NULL
 ) RETURNS uuid AS $$
-DECLARE v_order_id uuid; v_price numeric; v_total numeric; v_owner uuid; v_avail int; i int;
+DECLARE 
+    v_order_id uuid; 
+    v_ticket_price numeric; 
+    v_total_amount numeric := 0; 
+    v_owner uuid; 
+    v_avail int; 
+    v_current_price numeric;
+    v_current_seat_id uuid;
+    v_zone_multiplier numeric;
+    v_pos_modifier numeric;
+    i int;
 BEGIN
     v_owner := COALESCE(p_user_id, auth.uid());
-    SELECT price, (quantity_total - quantity_sold - quantity_reserved) INTO v_price, v_avail FROM ticket_types WHERE id = p_ticket_type_id FOR UPDATE;
+    IF v_owner IS NULL THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+
+    -- 1. Availability & Initial Check
+    SELECT price, (quantity_total - quantity_sold - quantity_reserved) INTO v_ticket_price, v_avail 
+    FROM ticket_types WHERE id = p_ticket_type_id FOR UPDATE;
     IF v_avail < p_quantity THEN RAISE EXCEPTION 'Sold out'; END IF;
-    v_total := v_price * p_quantity;
-    INSERT INTO orders (user_id, event_id, total_amount, status, metadata) VALUES (v_owner, p_event_id, v_total, 'pending', jsonb_build_object('buyer_email', p_buyer_email)) RETURNING id INTO v_order_id;
+
+    -- 2. Pre-calculate total amount (Seating Aware)
     FOR i IN 1..p_quantity LOOP
-        INSERT INTO tickets (event_id, owner_user_id, status, price, ticket_type_id, metadata) VALUES (p_event_id, v_owner, 'reserved', v_price, p_ticket_type_id, jsonb_build_object('attendee_name', p_attendee_names[i]));
-        INSERT INTO order_items (order_id, ticket_id, price_at_purchase) VALUES (v_order_id, (SELECT id FROM tickets WHERE event_id = p_event_id ORDER BY created_at DESC LIMIT 1), v_price);
+        v_current_price := v_ticket_price;
+        IF p_seat_ids IS NOT NULL AND array_length(p_seat_ids, 1) >= i THEN
+            SELECT vz.price_multiplier, vs.positional_modifier 
+            INTO v_zone_multiplier, v_pos_modifier 
+            FROM venue_seats vs JOIN venue_zones vz ON vs.zone_id = vz.id 
+            WHERE vs.id = p_seat_ids[i] AND vs.status = 'available';
+            
+            IF NOT FOUND THEN RAISE EXCEPTION 'Seat % is not available.', p_seat_ids[i]; END IF;
+            v_current_price := round((v_current_price * v_zone_multiplier * v_pos_modifier)::numeric, 2);
+        END IF;
+        v_total_amount := v_total_amount + v_current_price;
     END LOOP;
+
+    -- 3. Create Order
+    INSERT INTO orders (user_id, event_id, total_amount, status, metadata) 
+    VALUES (v_owner, p_event_id, v_total_amount, 'pending', jsonb_build_object('buyer_email', p_buyer_email, 'buyer_name', p_buyer_name)) 
+    RETURNING id INTO v_order_id;
+
+    -- 4. Create Tickets & Items
+    FOR i IN 1..p_quantity LOOP
+        v_current_price := v_ticket_price;
+        v_current_seat_id := NULL;
+        IF p_seat_ids IS NOT NULL AND array_length(p_seat_ids, 1) >= i THEN
+            v_current_seat_id := p_seat_ids[i];
+            SELECT vz.price_multiplier, vs.positional_modifier INTO v_zone_multiplier, v_pos_modifier 
+            FROM venue_seats vs JOIN venue_zones vz ON vs.zone_id = vz.id WHERE vs.id = v_current_seat_id;
+            v_current_price := round((v_current_price * v_zone_multiplier * v_pos_modifier)::numeric, 2);
+            UPDATE venue_seats SET status = 'reserved' WHERE id = v_current_seat_id;
+        END IF;
+
+        INSERT INTO tickets (event_id, owner_user_id, status, price, ticket_type_id, seat_id, metadata) 
+        VALUES (p_event_id, v_owner, 'reserved', v_current_price, p_ticket_type_id, v_current_seat_id, jsonb_build_object('attendee_name', p_attendee_names[i]))
+        RETURNING id INTO v_current_seat_id; -- Reuse variable for ticket_id
+
+        INSERT INTO order_items (order_id, ticket_id, price_at_purchase) VALUES (v_order_id, v_current_seat_id, v_current_price);
+    END LOOP;
+
     UPDATE ticket_types SET quantity_reserved = quantity_reserved + p_quantity WHERE id = p_ticket_type_id;
     RETURN v_order_id;
 END;
