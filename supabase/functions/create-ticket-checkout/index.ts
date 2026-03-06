@@ -17,11 +17,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const isAllowedOrigin = (origin: string | null): boolean => {
     if (!origin) return false;
-    if (origin === 'https://app.yilama.co.za') return true;
-    if (origin === 'https://yilama.co.za') return true;
-    if (origin.startsWith('http://localhost:')) return true;
-    if (origin.endsWith('.vercel.app')) return true;
-    return false;
+    const lowerOrigin = origin.toLowerCase();
+    return (
+        lowerOrigin === 'https://app.yilama.co.za' ||
+        lowerOrigin === 'https://yilama.co.za' ||
+        lowerOrigin.startsWith('http://localhost:') ||
+        lowerOrigin.endsWith('.vercel.app')
+    );
 };
 
 const corsHeaders = (reqOrigin: string | null): Record<string, string> => ({

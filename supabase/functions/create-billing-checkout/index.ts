@@ -4,25 +4,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 /**
  * YILAMA EVENTS: BILLING CHECKOUT INITIATOR (v2.0 — Security Hardened)
  * Prepares the PayFast redirection payload for organizer tier upgrades.
- *
- * Security fixes applied:
- *  - S-4:  userId extracted from verified JWT (not trusted from request body)
- *  - S-5:  Hard failure on missing credentials — no sandbox fallback in code
- *  - S-6:  isSandbox unified to `PAYFAST_ENVIRONMENT !== 'production'`
- *  - S-19: CORS restricted to configured origin
- *  - S-20: Stack traces not returned to client
  */
 
 const PRODUCTION_ORIGIN = 'https://app.yilama.co.za';
 
-function isAllowedOrigin(origin: string | null): boolean {
+const isAllowedOrigin = (origin: string | null): boolean => {
   if (!origin) return false;
-  if (origin === 'https://app.yilama.co.za') return true;
-  if (origin === 'https://yilama.co.za') return true;
-  if (origin.startsWith('http://localhost:')) return true;
-  if (origin.endsWith('.vercel.app')) return true;
-  return false;
-}
+  const lowerOrigin = origin.toLowerCase();
+  return (
+    lowerOrigin === 'https://app.yilama.co.za' ||
+    lowerOrigin === 'https://yilama.co.za' ||
+    lowerOrigin.startsWith('http://localhost:') ||
+    lowerOrigin.endsWith('.vercel.app')
+  );
+};
 
 function getAllowedOrigin(reqOrigin: string | null): string {
   if (isAllowedOrigin(reqOrigin)) return reqOrigin!;
@@ -90,7 +85,6 @@ serve(async (req) => {
   const merchantKey = Deno.env.get('PAYFAST_MERCHANT_KEY');
   const passphrase = Deno.env.get('PAYFAST_PASSPHRASE');
 
-  // S-5: Hard failure — never fall back to hardcoded sandbox credentials
   const missingSecrets = [
     !supabaseUrl && 'SUPABASE_URL',
     !supabaseServiceKey && 'SUPABASE_SERVICE_ROLE_KEY',
@@ -107,17 +101,11 @@ serve(async (req) => {
     );
   }
 
-  // S-6: Consistent isSandbox logic — production only when explicitly set
   const isProduction = Deno.env.get('PAYFAST_ENVIRONMENT') === 'production';
 
   try {
     const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-    // DEBUG: Verify environment sync
-    console.log(`[BILLING_CHECKOUT] Project URL: ${supabaseUrl}`);
-    console.log(`[BILLING_CHECKOUT] Service Key Prefix: ${supabaseServiceKey?.substring(0, 10)}...`);
-
-    // S-4: Extract authenticated userId from JWT — NEVER from request body
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing Authorization header');
 
@@ -131,10 +119,9 @@ serve(async (req) => {
 
     const { tier } = await req.json();
 
-    // Verify the authenticated user is an approved organizer
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('role, organizer_status, business_name, name, email')
+      .select('role, organizer_status, name, email')
       .eq('id', user.id)
       .single();
 
@@ -146,7 +133,6 @@ serve(async (req) => {
     const amount = prices[tier];
     if (!amount) throw new Error('INVALID_TIER');
 
-    // Create pending subscription
     const now = new Date();
     const periodEnd = new Date(now);
     periodEnd.setFullYear(periodEnd.getFullYear() + 1);
@@ -165,7 +151,6 @@ serve(async (req) => {
 
     if (subErr) throw subErr;
 
-    // Create pending billing_payment
     const mPaymentId = crypto.randomUUID();
     const { error: payErr } = await supabase
       .from('billing_payments')
@@ -178,7 +163,6 @@ serve(async (req) => {
       });
     if (payErr) throw payErr;
 
-    // Build PayFast Payload
     const origin = reqOrigin || PRODUCTION_ORIGIN;
     const nameParts = (profile.name || 'Organizer').split(' ');
 
@@ -196,12 +180,10 @@ serve(async (req) => {
       item_name: `Yilama - ${tier.toUpperCase()} Plan`,
     };
 
-    // Remove empty values (PayFast requirement)
     Object.keys(pfData).forEach(k => {
       if (!pfData[k] || pfData[k].trim() === '') delete pfData[k];
     });
 
-    // Generate MD5 signature
     const pfEncode = (val: string) =>
       encodeURIComponent(val).replace(/%20/g, '+').replace(/!/g, '%21').replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\*/g, '%2A');
 
@@ -225,7 +207,6 @@ serve(async (req) => {
 
   } catch (err: any) {
     console.error('[BILLING_CHECKOUT]', err.message);
-    // S-20: Never return stack traces to the client
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } }

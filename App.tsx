@@ -121,7 +121,6 @@ export default function App() {
   const isMounted = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fetchProfileRef = useRef<((id: string, isFresh?: boolean) => Promise<void>) | null>(null);
-
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     if (!isMounted.current) return;
     setToast({ message, type });
@@ -247,9 +246,9 @@ export default function App() {
         return baseProfile;
       })();
 
-      // Strict 5s timeout on the DB operation
+      // Strict 15s timeout on the DB operation to account for cold starts
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Profile fetch timed out")), 5000)
+        setTimeout(() => reject(new Error("Profile fetch timed out")), 15000)
       );
 
       const data = await Promise.race([profilePromise, timeoutPromise]) as Profile | null;

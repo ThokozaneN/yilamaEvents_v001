@@ -21,14 +21,16 @@ const merchantId = Deno.env.get("PAYFAST_MERCHANT_ID") ?? "";
 const payfastPassphrase = Deno.env.get("PAYFAST_PASSPHRASE") ?? "";
 const isProduction = Deno.env.get("PAYFAST_ENVIRONMENT") === "production";
 
-function isAllowedOrigin(origin: string | null): boolean {
+const isAllowedOrigin = (origin: string | null): boolean => {
     if (!origin) return false;
-    if (origin === 'https://app.yilama.co.za') return true;
-    if (origin === 'https://yilama.co.za') return true;
-    if (origin.startsWith('http://localhost:')) return true;
-    if (origin.endsWith('.vercel.app')) return true;
-    return false;
-}
+    const lowerOrigin = origin.toLowerCase();
+    return (
+        lowerOrigin === 'https://app.yilama.co.za' ||
+        lowerOrigin === 'https://yilama.co.za' ||
+        lowerOrigin.startsWith('http://localhost:') ||
+        lowerOrigin.endsWith('.vercel.app')
+    );
+};
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
