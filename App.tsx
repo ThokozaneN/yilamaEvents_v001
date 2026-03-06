@@ -227,7 +227,7 @@ export default function App() {
       // Use a timeout for the profile fetch to prevent indefinite hangs
       const profilePromise = (async () => {
         // 1. Try the composite view first
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from('v_composite_profiles')
           .select('*')
           .eq('id', userId)
