@@ -119,10 +119,10 @@ serve(async (req: Request) => {
         console.log(`[TICKET_CHECKOUT] Project URL: ${supabaseUrl}`);
         console.log(`[TICKET_CHECKOUT] Service Key Prefix: ${supabaseServiceKey?.substring(0, 10)}...`);
 
-        // 1. Identify the buyer — verify the JWT cryptographically via Supabase Auth.
+        // 1. Identify the buyer
         const authHeader = req.headers.get('Authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            console.error('[TICKET_CHECKOUT] Missing or invalid Authorization header');
+        if (!authHeader) {
+            console.error('[TICKET_CHECKOUT] No Authorization header present');
             return new Response(
                 JSON.stringify({ error: 'Unauthorized', message: 'Missing Authorization header.' }),
                 { status: 401, headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' } }
@@ -131,26 +131,19 @@ serve(async (req: Request) => {
 
         const jwt = authHeader.replace('Bearer ', '');
 
-        // Use the service role key + user token so RLS and auth.getUser() work correctly.
-        // As per documentation and audit requirements:
-        const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const userClient = createClient(supabaseUrl!, supabaseServiceRoleKey, {
-            global: { headers: { Authorization: authHeader } }
-        });
-
-        // 2. Validate the session attached to the headers
-        console.log('[TICKET_CHECKOUT] Validating JWT session...');
-        const { data: { user }, error: authErr } = await userClient.auth.getUser();
+        // 2. Validate the user session using the service role client
+        console.log('[TICKET_CHECKOUT] Validating JWT with Service Role...');
+        const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt);
 
         if (authErr || !user) {
-            console.error('[TICKET_CHECKOUT] JWT verification failed:', authErr?.message || 'No user found');
+            console.error('[TICKET_CHECKOUT] Auth check failed:', authErr?.message || 'No user found');
             return new Response(
-                JSON.stringify({ error: 'Unauthorized', message: 'Invalid or expired session.' }),
+                JSON.stringify({ error: 'Unauthorized', message: 'Invalid session. Please sign in again.' }),
                 { status: 401, headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' } }
             );
         }
 
-        console.log(`[TICKET_CHECKOUT] Verified user: ${user.id}`);
+        console.log(`[TICKET_CHECKOUT] Authenticated user: ${user.id}`);
 
         // 2. Parse request body
         const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds, paymentMethod } = await req.json();
