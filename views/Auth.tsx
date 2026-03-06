@@ -114,6 +114,7 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
           if (profile) onLogin(profile as Profile);
         }
       } else if (mode === 'signin') {
+        console.log(`[AUTH_AUDIT] Attempting sign-in for ${email}...`);
         // Zod validation for signin
         const result = signInSchema.safeParse({ email, password });
         if (!result.success) {
@@ -129,6 +130,7 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         });
 
         if (signInError) {
+          console.warn("[AUTH_AUDIT] Sign-in error:", signInError);
           const newCount = attemptCount + 1;
           setAttemptCount(newCount);
           if (newCount >= 3) {
@@ -144,16 +146,22 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         }
 
         if (data.user) {
+          console.log(`[AUTH_AUDIT] Sign-in successful for ${data.user.id}. Fetching composite profile...`);
           const { data: profile, error: profileError } = await supabase
             .from('v_composite_profiles') // Use view to get full details
             .select('*')
             .eq('id', data.user.id)
             .maybeSingle();
 
-          if (profileError) throw profileError;
+          if (profileError) {
+            console.error("[AUTH_AUDIT] Profile fetch error:", profileError);
+            throw profileError;
+          }
           if (!profile) {
+            console.error("[AUTH_AUDIT] Profile not found (Ghost User).");
             throw new Error("Ghost User Detected: Your Auth account was created, but the Profile trigger failed. Please delete this user in your Supabase Auth Dashboard and sign up again.");
           }
+          console.log("[AUTH_AUDIT] Profile retrieved. Calling onLogin...");
           onLogin(profile as Profile);
         }
       } else if (mode === 'forgot-password') {

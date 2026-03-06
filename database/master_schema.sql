@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at timestamptz DEFAULT NOW()
 );
 
+-- COMPOSITE PROFILES (Unified view for auth status)
+CREATE OR REPLACE VIEW public.v_composite_profiles
+WITH (security_invoker = false) -- SECURITY DEFINER: runs as view owner (postgres)
+AS
+SELECT
+    p.*,
+    u.email_confirmed_at IS NOT NULL AS email_verified
+FROM public.profiles p
+LEFT JOIN auth.users u ON p.id = u.id;
+
+REVOKE SELECT ON public.v_composite_profiles FROM anon;
+GRANT SELECT ON public.v_composite_profiles TO authenticated;
+
 -- PLANS (Tier definition)
 CREATE TABLE IF NOT EXISTS public.plans (
     id text PRIMARY KEY, -- 'free', 'pro', 'premium'
