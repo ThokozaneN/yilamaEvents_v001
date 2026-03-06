@@ -642,5 +642,120 @@ INSERT INTO event_categories (name, slug, icon_name, display_order) VALUES
 ('Music', 'music', 'Music', 1), ('Arts', 'arts', 'Palette', 2), ('Food', 'food', 'Utensils', 3), ('Other', 'other', 'Calendar', 99)
 ON CONFLICT (slug) DO NOTHING;
 
+
+-- =============================================================================
+-- DISCOVERY & RECOMMENDATION ENGINE
+-- =============================================================================
+
+-- 1. Sales-Driven Trending Events
+CREATE OR REPLACE FUNCTION get_trending_events(p_lat FLOAT DEFAULT NULL, p_lng FLOAT DEFAULT NULL)
+RETURNS SETOF events AS $$
+BEGIN
+    RETURN QUERY
+    WITH EventStats AS (
+        SELECT 
+            e.id,
+            COALESCE(
+                (SELECT LEAST(SUM(quantity_sold)::NUMERIC / NULLIF(SUM(quantity_limit), 0), 1.0)
+                 FROM ticket_types WHERE event_id = e.id),
+                0
+            ) as sales_velocity,
+            COALESCE(
+                (SELECT SUM(quantity_sold) FROM ticket_types WHERE event_id = e.id),
+                0
+            ) as total_sold,
+            CASE 
+                WHEN p_lat IS NOT NULL AND p_lng IS NOT NULL AND e.latitude IS NOT NULL AND e.longitude IS NOT NULL THEN
+                    (6371 * acos(cos(radians(p_lat)) * cos(radians(e.latitude)) * cos(radians(e.longitude) - radians(p_lng)) + sin(radians(p_lat)) * sin(radians(e.latitude))))
+                ELSE NULL
+            END as distance
+        FROM events e
+        WHERE e.status = 'published'
+    )
+    SELECT e.*
+    FROM events e
+    JOIN EventStats s ON e.id = s.id
+    JOIN profiles p ON e.organizer_id = p.id
+    WHERE e.status = 'published'
+    AND COALESCE(e.ends_at, e.starts_at + interval '6 hours') >= NOW()
+    AND s.total_sold >= 5
+    ORDER BY 
+        CASE WHEN s.distance <= 50 THEN 1 ELSE 2 END,
+        ((s.sales_velocity * 0.7) + (CASE WHEN p.organizer_tier = 'premium' THEN 0.3 ELSE 0 END)) DESC,
+        e.starts_at ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Personalized Event Recommendations
+CREATE OR REPLACE FUNCTION get_personalized_events(p_user_id UUID DEFAULT NULL)
+RETURNS SETOF events AS $$
+BEGIN
+    IF p_user_id IS NULL THEN
+        RETURN QUERY
+        SELECT e.* 
+        FROM events e
+        WHERE e.status = 'published'
+        AND COALESCE(e.ends_at, e.starts_at + interval '6 hours') >= NOW()
+        ORDER BY 
+            COALESCE((SELECT CASE WHEN SUM(quantity_limit) > 0 THEN SUM(quantity_sold)::NUMERIC / SUM(quantity_limit)::NUMERIC ELSE 0 END FROM ticket_types WHERE event_id = e.id), 0) DESC,
+            e.created_at DESC;
+    ELSE
+        RETURN QUERY
+        WITH
+            PastCategories AS (
+                SELECT DISTINCT e.category_id FROM tickets t JOIN events e ON t.event_id = e.id WHERE t.owner_user_id = p_user_id AND e.category_id IS NOT NULL
+            ),
+            PastOrganizers AS (
+                SELECT DISTINCT e.organizer_id FROM tickets t JOIN events e ON t.event_id = e.id WHERE t.owner_user_id = p_user_id
+            ),
+            ScoredEvents AS (
+                SELECT 
+                    e.*,
+                    COALESCE((SELECT CASE WHEN SUM(quantity_limit) > 0 THEN (SUM(quantity_sold)::NUMERIC / SUM(quantity_limit)::NUMERIC) * 10 ELSE 0 END FROM ticket_types WHERE event_id = e.id), 0) 
+                    + CASE WHEN e.category_id IN (SELECT category_id FROM PastCategories) THEN 10 ELSE 0 END
+                    + CASE WHEN e.organizer_id IN (SELECT organizer_id FROM PastOrganizers) THEN 5 ELSE 0 END
+                    AS total_score
+                FROM events e
+                WHERE e.status = 'published'
+                AND COALESCE(e.ends_at, e.starts_at + interval '6 hours') >= NOW()
+            )
+        SELECT (SELECT e FROM events e WHERE e.id = ScoredEvents.id).*
+        FROM ScoredEvents
+        ORDER BY total_score DESC, starts_at ASC;
+    END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Unified Discovery Entry Point
+CREATE OR REPLACE FUNCTION get_discovery_events(p_user_id uuid DEFAULT NULL)
+RETURNS jsonb AS $$
+DECLARE
+    v_personalized_events jsonb;
+    v_trending_events jsonb;
+    v_now timestamptz := now();
+BEGIN
+    WITH raw_personalized AS (SELECT id FROM get_personalized_events(p_user_id) LIMIT 50)
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'id', e.id, 'title', e.title, 'description', e.description, 'venue', e.venue, 'image_url', e.image_url, 'category', e.category, 'starts_at', e.starts_at, 'ends_at', e.ends_at, 'status', e.status, 'is_seated', e.is_seated, 'created_at', e.created_at, 'organizer_id', e.organizer_id,
+            'tiers', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', tt.id, 'name', tt.name, 'price', tt.price, 'quantity_limit', tt.quantity_limit, 'quantity_sold', tt.quantity_sold)), '[]'::jsonb) FROM ticket_types tt WHERE tt.event_id = e.id),
+            'organizer', jsonb_build_object('business_name', p.business_name, 'organizer_status', p.organizer_status, 'organizer_tier', p.organizer_tier, 'instagram_handle', p.instagram_handle, 'twitter_handle', p.twitter_handle, 'facebook_handle', p.facebook_handle, 'website_url', p.website_url)
+        )), '[]'::jsonb) INTO v_personalized_events
+    FROM raw_personalized rp JOIN events e ON e.id = rp.id LEFT JOIN profiles p ON p.id = e.organizer_id;
+
+    WITH raw_trending AS (SELECT id FROM get_trending_events() LIMIT 10)
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'id', e.id, 'title', e.title, 'description', e.description, 'venue', e.venue, 'image_url', e.image_url, 'category', e.category, 'starts_at', e.starts_at, 'ends_at', e.ends_at, 'status', e.status, 'is_seated', e.is_seated, 'created_at', e.created_at, 'organizer_id', e.organizer_id,
+            'tiers', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', tt.id, 'name', tt.name, 'price', tt.price, 'quantity_limit', tt.quantity_limit, 'quantity_sold', tt.quantity_sold)), '[]'::jsonb) FROM ticket_types tt WHERE tt.event_id = e.id),
+            'organizer', jsonb_build_object('business_name', p.business_name, 'organizer_status', p.organizer_status, 'organizer_tier', p.organizer_tier, 'instagram_handle', p.instagram_handle, 'twitter_handle', p.twitter_handle, 'facebook_handle', p.facebook_handle, 'website_url', p.website_url)
+        )), '[]'::jsonb) INTO v_trending_events
+    FROM raw_trending rt JOIN events e ON e.id = rt.id LEFT JOIN profiles p ON p.id = e.organizer_id;
+
+    RETURN jsonb_build_object('personalized', v_personalized_events, 'trending', v_trending_events);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION get_discovery_events(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_discovery_events(uuid) TO anon;
+
 -- Safety search_path
 ALTER DATABASE postgres SET search_path TO public, auth, extensions, storage;

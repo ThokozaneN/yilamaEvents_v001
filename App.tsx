@@ -120,6 +120,7 @@ export default function App() {
 
   const isMounted = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const fetchProfileRef = useRef<((id: string, isFresh?: boolean) => Promise<void>) | null>(null);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     if (!isMounted.current) return;
@@ -280,6 +281,10 @@ export default function App() {
       if (isMounted.current) setAuthSessionChecked(true);
     }
   }, [fetchTickets, fetchUnreadCount, showToast, handleNavigate]);
+
+  useEffect(() => {
+    fetchProfileRef.current = fetchProfile;
+  }, [fetchProfile]);
 
   const fetchEvents = useCallback(async () => {
     // Cancel previous request if any
@@ -466,7 +471,7 @@ export default function App() {
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          await fetchProfileRef.current?.(session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -483,7 +488,7 @@ export default function App() {
       abortControllerRef.current?.abort();
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, []); // Break the dependency on fetchProfile
 
   // Realtime subscription for unread notifications (replaces 60s polling)
   useEffect(() => {
