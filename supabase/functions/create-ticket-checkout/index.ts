@@ -235,7 +235,7 @@ serve(async (req: Request) => {
         const pfData: Record<string, string> = {
             merchant_id: merchantId!,
             merchant_key: merchantKey!,
-            return_url: `${redirectOrigin}/tickets?order=${orderId}&payment=success`,
+            return_url: `${redirectOrigin}/?order=${orderId}&payment=success`,
             cancel_url: `${redirectOrigin}/event/${eventId}?payment=cancelled`,
 
             notify_url: `${supabaseUrl}/functions/v1/payfast-itn`,

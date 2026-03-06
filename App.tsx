@@ -519,7 +519,7 @@ export default function App() {
     if (paymentStatus === 'success') {
       showToast('Payment successful! Your tickets are in your wallet.', 'success');
       handleNavigate('wallet');
-      window.history.replaceState({}, '', window.location.pathname); // clean URL
+      window.history.replaceState({}, '', '/'); // clean URL fully
       if (user) {
         // Fetch immediately, then retry after 3s to catch async ITN confirmation
         fetchTickets(user.id);
