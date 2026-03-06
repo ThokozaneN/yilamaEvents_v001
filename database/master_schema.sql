@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS public.ticket_types (
     name text NOT NULL,
     description text,
     price numeric(10,2) NOT NULL DEFAULT 0.00,
-    quantity_total int NOT NULL DEFAULT 0,
+    quantity_limit int NOT NULL DEFAULT 0,
     quantity_sold int NOT NULL DEFAULT 0,
     quantity_reserved int NOT NULL DEFAULT 0,
     sale_start timestamptz,
@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.ticket_types (
     
     created_at timestamptz DEFAULT NOW(),
     updated_at timestamptz DEFAULT NOW(),
-    CONSTRAINT inventory_cap CHECK (quantity_sold + quantity_reserved <= quantity_total)
+    CONSTRAINT inventory_cap CHECK (quantity_sold + quantity_reserved <= quantity_limit)
 );
 
 -- TICKETS
@@ -485,7 +485,7 @@ BEGIN
     IF v_owner IS NULL THEN RAISE EXCEPTION 'Unauthorized'; END IF;
 
     -- 1. Availability & Initial Check
-    SELECT price, (quantity_total - quantity_sold - quantity_reserved) INTO v_ticket_price, v_avail 
+    SELECT price, (quantity_limit - quantity_sold - quantity_reserved) INTO v_ticket_price, v_avail 
     FROM ticket_types WHERE id = p_ticket_type_id FOR UPDATE;
     IF v_avail < p_quantity THEN RAISE EXCEPTION 'Sold out'; END IF;
 

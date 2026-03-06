@@ -77,7 +77,7 @@ BEGIN
     END IF;
 
     -- 1. Availability check with row lock
-    SELECT price, (quantity_total - quantity_sold - quantity_reserved) 
+    SELECT price, (quantity_limit - quantity_sold - quantity_reserved) 
     INTO v_ticket_price, v_avail 
     FROM ticket_types WHERE id = p_ticket_type_id FOR UPDATE;
     
