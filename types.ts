@@ -146,6 +146,7 @@ export interface Event {
   price?: number;
   layout_id?: string;
   is_seated?: boolean;
+  is_test_mode?: boolean;
   created_at?: string;
   organizer?: Profile;
 }
