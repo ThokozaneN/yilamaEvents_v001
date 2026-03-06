@@ -146,20 +146,38 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         }
 
         if (data.user) {
-          console.log(`[AUTH_AUDIT] Sign-in successful for ${data.user.id}. Fetching composite profile...`);
-          const { data: profile, error: profileError } = await supabase
-            .from('v_composite_profiles') // Use view to get full details
-            .select('*')
-            .eq('id', data.user.id)
-            .maybeSingle();
+          console.log(`[AUTH_AUDIT] Sign-in successful for ${data.user.id}. Fetching profile...`);
 
-          if (profileError) {
-            console.error("[AUTH_AUDIT] Profile fetch error:", profileError);
-            throw profileError;
-          }
+          const profilePromise = (async () => {
+            // 1. Try view
+            const { data: profile } = await supabase
+              .from('v_composite_profiles')
+              .select('*')
+              .eq('id', data.user!.id)
+              .maybeSingle();
+
+            if (profile) return profile;
+
+            // 2. Fallback to basic profiles
+            console.warn("[AUTH_AUDIT] Sign-in fallback to profiles table...");
+            const { data: baseProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user!.id)
+              .maybeSingle();
+
+            return baseProfile;
+          })();
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Profile query timed out")), 5000)
+          );
+
+          const profile = await Promise.race([profilePromise, timeoutPromise]) as Profile | null;
+
           if (!profile) {
             console.error("[AUTH_AUDIT] Profile not found (Ghost User).");
-            throw new Error("Ghost User Detected: Your Auth account was created, but the Profile trigger failed. Please delete this user in your Supabase Auth Dashboard and sign up again.");
+            throw new Error("Ghost User Detected: Your Auth account exists, but your Profile is missing.");
           }
           console.log("[AUTH_AUDIT] Profile retrieved. Calling onLogin...");
           onLogin(profile as Profile);

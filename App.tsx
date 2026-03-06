@@ -223,16 +223,45 @@ export default function App() {
     if (!isMounted.current) return;
     try {
       console.log(`[AUTH_AUDIT] Fetching profile for ${userId}...`);
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error } = await supabase.from('v_composite_profiles').select('*').eq('id', userId).maybeSingle();
+
+      // Use a timeout for the profile fetch to prevent indefinite hangs
+      const profilePromise = (async () => {
+        // 1. Try the composite view first
+        const { data: profile, error } = await supabase
+          .from('v_composite_profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (profile) return profile;
+
+        // 2. Fallback to direct profiles table if view is empty or failed
+        console.warn("[AUTH_AUDIT] v_composite_profiles fallback to profiles table...");
+        const { data: baseProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        return baseProfile;
+      })();
+
+      // Strict 5s timeout on the DB operation
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Profile fetch timed out")), 5000)
+      );
+
+      const data = await Promise.race([profilePromise, timeoutPromise]) as Profile | null;
 
       if (!isMounted.current) return;
-      if (error || !data) {
-        console.warn("[AUTH_AUDIT] Profile fetch error or empty:", error);
+      if (!data) {
+        console.warn("[AUTH_AUDIT] Profile result is empty.");
         setAuthSessionChecked(true);
         return;
       }
 
+      console.log(`[AUTH_AUDIT] Profile sync succeeded for ${data.email || userId}`);
+      const { data: { session } } = await supabase.auth.getSession();
       const profile = { ...data, email_verified: !!session?.user?.email_confirmed_at } as Profile;
       setUser(profile);
       fetchTickets(userId);
