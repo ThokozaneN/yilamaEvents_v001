@@ -545,7 +545,8 @@ export default function App() {
     tierId?: string,
     attendeeNames: string[] = [],
     promoCode?: string,
-    seatIds?: string[]
+    seatIds?: string[],
+    isTestMode?: boolean
   ) => {
     if (!user) { handleNavigate('auth'); return; }
     if (!user.email_verified) { showToast('Verify email in Settings to buy tickets.', 'error'); return; }
@@ -576,7 +577,8 @@ export default function App() {
           quantity: seatIds && seatIds.length > 0 ? seatIds.length : qty,
           attendeeNames: attendeeNames.length ? attendeeNames : [],
           promoCode: promoCode || null,
-          seatIds: seatIds && seatIds.length > 0 ? seatIds : null
+          seatIds: seatIds && seatIds.length > 0 ? seatIds : null,
+          isTestMode: isTestMode
         }
       });
 

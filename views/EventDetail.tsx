@@ -13,7 +13,7 @@ interface EventDetailProps {
   user: Profile | null;
   onNavigateAuth: () => void;
   // Fix: Return type should be void | Promise<void> and include promoCode to match handlePurchase in App.tsx
-  onPurchase: (qty: number, tierId?: string, attendeeNames?: string[], promoCode?: string, seatIds?: string[]) => void | Promise<void>;
+  onPurchase: (qty: number, tierId?: string, attendeeNames?: string[], promoCode?: string, seatIds?: string[], isTestMode?: boolean) => void | Promise<void>;
 }
 
 export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNavigateAuth, onPurchase }) => {
@@ -30,6 +30,7 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
   // U-8.3: Promo code state
   const [promoCode, setPromoCode] = useState('');
   const [showPromo, setShowPromo] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(event.is_test_mode !== false);
   const MAX_QTY = 20; // A-6.2 client-side cap (server also enforces this)
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
     setIsProcessing(true);
     try {
       // U-8.3: Pass promoCode through to onPurchase
-      await onPurchase(qty, selectedTierId, Array(qty).fill(user.name), promoCode || undefined);
+      await onPurchase(qty, selectedTierId, Array(qty).fill(user.name), promoCode || undefined, undefined, isTestMode);
       setIsCheckoutOpen(false);
     } catch (err: any) {
       alert(err.message);
@@ -264,6 +265,20 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
               )}
             </div>
 
+            {/* Payment Environment Toggle */}
+            <div className="relative z-10 p-5 rounded-3xl themed-secondary-bg border themed-border border-dashed flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Payment Mode</span>
+                <p className="text-xs font-bold themed-text uppercase">{isTestMode ? 'Sandbox (Test)' : 'Real Payment (Live)'}</p>
+              </div>
+              <button
+                onClick={() => setIsTestMode(!isTestMode)}
+                className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${isTestMode ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'}`}
+              >
+                Switch to {isTestMode ? 'Live' : 'Sandbox'}
+              </button>
+            </div>
+
             <div className="space-y-3 relative z-10">
               <button
                 onClick={handleFinalPurchase}
@@ -307,7 +322,7 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
             if (!user) { onNavigateAuth(); return; }
             setIsProcessing(true);
             try {
-              await onPurchase(seatIds.length, selectedTierId, Array(seatIds.length).fill(user.name), undefined, seatIds);
+              await onPurchase(seatIds.length, selectedTierId, Array(seatIds.length).fill(user.name), undefined, seatIds, isTestMode);
               setIsSeatingModalOpen(false);
             } catch (err: any) {
               alert(err.message);

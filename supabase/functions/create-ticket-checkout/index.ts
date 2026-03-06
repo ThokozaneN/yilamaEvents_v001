@@ -117,7 +117,7 @@ serve(async (req: Request) => {
         console.log(`[TICKET_CHECKOUT] Authenticated user: ${user.id}`);
 
         // 3. Parse request body
-        const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds, paymentMethod } = await req.json();
+        const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds, paymentMethod, isTestMode: forcedTestMode } = await req.json();
 
         if (!eventId || !ticketTypeId || !quantity) {
             throw new Error('Missing required fields: eventId, ticketTypeId, quantity');
@@ -132,10 +132,13 @@ serve(async (req: Request) => {
 
         if (eventErr || !event) throw new Error('Event not found or inaccessible.');
 
-        const isTestEvent = event.is_test_mode !== false; // Default to true if null/missing
+        // 5. Select Payment Mode: Priority: forcedTestMode (from UI) > event.is_test_mode > default (true)
+        const isTestEvent = forcedTestMode !== undefined ? forcedTestMode : (event.is_test_mode !== false);
+        const isProduction = Deno.env.get('PAYFAST_ENVIRONMENT') === 'production';
+
         console.log(`[TICKET_CHECKOUT] Routing: ${isTestEvent ? 'SANDBOX' : 'LIVE'} mode for event "${event.title}"`);
 
-        // 5. Select PayFast Credentials
+        // 6. Select PayFast Credentials
         const merchantId = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_ID') : Deno.env.get('PAYFAST_MERCHANT_ID');
         const merchantKey = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_KEY') : Deno.env.get('PAYFAST_MERCHANT_KEY');
         const passphrase = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_PASSPHRASE') : Deno.env.get('PAYFAST_PASSPHRASE');
