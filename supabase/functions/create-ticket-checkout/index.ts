@@ -153,7 +153,7 @@ serve(async (req: Request) => {
         console.log(`[TICKET_CHECKOUT] Verified user: ${user.id}`);
 
         // 2. Parse request body
-        const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds } = await req.json();
+        const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds, paymentMethod } = await req.json();
 
         if (!eventId || !ticketTypeId || !quantity) {
             throw new Error('Missing required fields: eventId, ticketTypeId, quantity');
@@ -247,6 +247,11 @@ serve(async (req: Request) => {
             item_name: `${eventTitle} - x${quantity} Ticket(s)`,
             item_description: `Order #${orderId}`,
         };
+
+        // Add optional payment method override (e.g., 'cc', 'ap', 'sp')
+        if (paymentMethod) {
+            pfData.payment_method = paymentMethod;
+        }
 
         // Remove any empty/whitespace-only values (PayFast requirement)
         Object.keys(pfData).forEach(k => {

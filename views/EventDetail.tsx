@@ -277,10 +277,17 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
                   </>
                 )}
               </button>
-              {/* U-8.5: PayFast trust logo text */}
-              <div className="flex items-center justify-center gap-2 opacity-30">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                <span className="text-[9px] font-bold uppercase tracking-widest">Powered by PayFast · 256-bit SSL</span>
+              {/* U-8.5: PayFast trust indicators */}
+              <div className="flex flex-col items-center gap-4 opacity-40">
+                <div className="flex flex-wrap justify-center gap-2">
+                  {['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'Samsung Pay'].map(m => (
+                    <span key={m} className="px-2 py-1 border themed-border rounded text-[8px] font-black uppercase tracking-widest whitespace-nowrap">{m}</span>
+                  ))}
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                  <span className="text-[9px] font-bold uppercase tracking-widest">Securely Processed via PayFast · 256-bit SSL</span>
+                </div>
               </div>
               <button
                 onClick={() => { setIsCheckoutOpen(false); setShowPromo(false); setPromoCode(''); }}

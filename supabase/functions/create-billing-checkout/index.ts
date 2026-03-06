@@ -117,7 +117,7 @@ serve(async (req) => {
       throw new Error(`Authentication failed: ${authErr?.message || 'Invalid session'}`);
     }
 
-    const { tier } = await req.json();
+    const { tier, paymentMethod } = await req.json();
 
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
@@ -179,6 +179,11 @@ serve(async (req) => {
       amount: amount.toFixed(2),
       item_name: `Yilama - ${tier.toUpperCase()} Plan`,
     };
+
+    // Add optional payment method override (e.g., 'cc', 'ap', 'sp')
+    if (paymentMethod) {
+      pfData.payment_method = paymentMethod;
+    }
 
     Object.keys(pfData).forEach(k => {
       if (!pfData[k] || pfData[k].trim() === '') delete pfData[k];

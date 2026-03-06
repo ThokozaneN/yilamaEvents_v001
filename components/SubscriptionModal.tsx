@@ -171,9 +171,16 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
                         </div>
                     </div>
 
-                    <p className="text-center text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-8">
-                        Payments are securely processed via PayFast.
-                    </p>
+                    <div className="mt-8 flex flex-col items-center gap-4 opacity-40">
+                        <div className="flex flex-wrap justify-center gap-2">
+                            {['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'Samsung Pay'].map(m => (
+                                <span key={m} className="px-2 py-1 border themed-border rounded text-[8px] font-black uppercase tracking-widest whitespace-nowrap">{m}</span>
+                            ))}
+                        </div>
+                        <p className="text-center text-[10px] font-bold themed-text uppercase tracking-widest">
+                            Securely processed via PayFast · 256-bit SSL
+                        </p>
+                    </div>
                 </div>
 
             </div>

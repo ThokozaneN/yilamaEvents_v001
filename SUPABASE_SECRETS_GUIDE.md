@@ -66,10 +66,22 @@ npx supabase secrets set API_KEY=your_gemini_api_key_here
 
 ### Set PayFast Credentials
 ```bash
-npx supabase secrets set PAYFAST_PASSPHRASE=your_passphrase
-npx supabase secrets set PAYFAST_MERCHANT_ID=your_id
-npx supabase secrets set PAYFAST_MERCHANT_KEY=your_key
+# For testing (Sandbox)
 npx supabase secrets set PAYFAST_ENVIRONMENT=sandbox
+npx supabase secrets set PAYFAST_MERCHANT_ID=10000100
+npx supabase secrets set PAYFAST_MERCHANT_KEY=46f0cd694581a
+npx supabase secrets set PAYFAST_PASSPHRASE=your_sandbox_passphrase
+
+# For Production (When ready to go live)
+# 1. Update your PayFast dashboard to enable:
+#    - American Express
+#    - Credit & Debit Cards (Visa/Mastercard)
+#    - Apple Pay & Samsung Pay
+# 2. Update secrets:
+npx supabase secrets set PAYFAST_ENVIRONMENT=production
+npx supabase secrets set PAYFAST_MERCHANT_ID=your_real_id
+npx supabase secrets set PAYFAST_MERCHANT_KEY=your_real_key
+npx supabase secrets set PAYFAST_PASSPHRASE=your_real_passphrase
 ```
 
 ---
