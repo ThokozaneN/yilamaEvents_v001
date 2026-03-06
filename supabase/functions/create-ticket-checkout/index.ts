@@ -84,40 +84,11 @@ serve(async (req: Request) => {
 
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req.headers.get('origin')) });
 
-    // Outer guard: ensure we ALWAYS return a proper CORS response even on catastrophic failure
     try {
-
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        const merchantId = Deno.env.get('PAYFAST_MERCHANT_ID');
-        const merchantKey = Deno.env.get('PAYFAST_MERCHANT_KEY');
-        const passphrase = Deno.env.get('PAYFAST_PASSPHRASE');
-
-        // S-5: Hard failure on missing credentials — never fall back to hardcoded sandbox values
-        const missingSecrets = [
-            !supabaseUrl && 'SUPABASE_URL',
-            !supabaseServiceKey && 'SUPABASE_SERVICE_ROLE_KEY',
-            !merchantId && 'PAYFAST_MERCHANT_ID',
-            !merchantKey && 'PAYFAST_MERCHANT_KEY',
-            !passphrase && 'PAYFAST_PASSPHRASE',
-        ].filter(Boolean);
-
-        if (missingSecrets.length > 0) {
-            console.error('[TICKET_CHECKOUT] FATAL: Missing secrets:', missingSecrets.join(', '));
-            return new Response(
-                JSON.stringify({ error: 'Server misconfigured. Contact support.' }),
-                { status: 500, headers: { ...corsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // S-6: Consistent production check — only 'production' enables live PayFast
-        const isProduction = Deno.env.get('PAYFAST_ENVIRONMENT') === 'production';
 
         const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
-
-        // DEBUG: Verify environment sync
-        console.log(`[TICKET_CHECKOUT] Project URL: ${supabaseUrl}`);
-        console.log(`[TICKET_CHECKOUT] Service Key Prefix: ${supabaseServiceKey?.substring(0, 10)}...`);
 
         // 1. Identify the buyer
         const authHeader = req.headers.get('Authorization');
@@ -145,12 +116,36 @@ serve(async (req: Request) => {
 
         console.log(`[TICKET_CHECKOUT] Authenticated user: ${user.id}`);
 
-        // 2. Parse request body
+        // 3. Parse request body
         const { eventId, ticketTypeId, quantity, attendeeNames, promoCode, seatIds, paymentMethod } = await req.json();
 
         if (!eventId || !ticketTypeId || !quantity) {
             throw new Error('Missing required fields: eventId, ticketTypeId, quantity');
         }
+
+        // 4. Get event mode (Sandbox vs Real)
+        const { data: event, error: eventErr } = await supabase
+            .from('events')
+            .select('title, is_test_mode')
+            .eq('id', eventId)
+            .single();
+
+        if (eventErr || !event) throw new Error('Event not found or inaccessible.');
+
+        const isTestEvent = event.is_test_mode !== false; // Default to true if null/missing
+        console.log(`[TICKET_CHECKOUT] Routing: ${isTestEvent ? 'SANDBOX' : 'LIVE'} mode for event "${event.title}"`);
+
+        // 5. Select PayFast Credentials
+        const merchantId = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_ID') : Deno.env.get('PAYFAST_MERCHANT_ID');
+        const merchantKey = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_KEY') : Deno.env.get('PAYFAST_MERCHANT_KEY');
+        const passphrase = isTestEvent ? Deno.env.get('PAYFAST_SANDBOX_PASSPHRASE') : Deno.env.get('PAYFAST_PASSPHRASE');
+
+        if (!merchantId || !merchantKey || !passphrase) {
+            console.error(`[TICKET_CHECKOUT] Missing ${isTestEvent ? 'SANDBOX' : 'LIVE'} credentials`);
+            throw new Error('Payment gateway configuration is incomplete.');
+        }
+
+        // 6. Get buyer profile
 
         if (seatIds && Array.isArray(seatIds) && seatIds.length > 0 && seatIds.length !== quantity) {
             throw new Error('Quantity must match the number of selected seats');

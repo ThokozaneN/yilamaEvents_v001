@@ -166,8 +166,28 @@ serve(async (req) => {
     const calculatedSignature = md5(signatureBase);
 
     if (receivedSignature !== calculatedSignature) {
-      console.error(`[PAYFAST_ITN] Signature mismatch — received: ${receivedSignature}, expected: ${calculatedSignature}`);
-      return new Response('Unauthorized', { status: 401 });
+      // ─── Security Check 2.1: Try Sandbox Passphrase fallback if Live failed ────
+      // This handles cases where an ITN might be from Sandbox even if the default is Live.
+      const sandboxPassphrase = Deno.env.get('PAYFAST_SANDBOX_PASSPHRASE');
+      if (sandboxPassphrase && sandboxPassphrase !== payfastPassphrase) {
+        let sbOutput = '';
+        Object.keys(dataForSig).forEach((key) => {
+          sbOutput += `${key}=${pfEncode(dataForSig[key].trim())}&`;
+        });
+        let sbBase = sbOutput.slice(0, -1);
+        sbBase += `&passphrase=${pfEncode(sandboxPassphrase.trim())}`;
+        const sbSignature = md5(sbBase);
+
+        if (receivedSignature === sbSignature) {
+          console.log(`[PAYFAST_ITN] Valid signature using SANDBOX passphrase for ref=${data.m_payment_id}`);
+        } else {
+          console.error(`[PAYFAST_ITN] Signature mismatch — rejected both LIVE and SANDBOX passphrases`);
+          return new Response('Unauthorized', { status: 401 });
+        }
+      } else {
+        console.error(`[PAYFAST_ITN] Signature mismatch — received: ${receivedSignature}, expected: ${calculatedSignature}`);
+        return new Response('Unauthorized', { status: 401 });
+      }
     }
 
     // ─── Route: Ticket Order vs Subscription ────────────────────────────────────

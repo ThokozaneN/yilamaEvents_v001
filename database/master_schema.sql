@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS public.events (
     -- Seating
     layout_id uuid, -- references venue_layouts(id)
     is_seated boolean DEFAULT false,
+    is_test_mode boolean DEFAULT true, -- Routing for PayFast (Sandbox vs Real)
 
     -- Rich Fields
     cooler_box_price numeric(10,2) DEFAULT 0,

@@ -23,6 +23,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='events' AND column_name='layout_id') THEN
         ALTER TABLE public.events ADD COLUMN layout_id UUID;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='events' AND column_name='is_test_mode') THEN
+        ALTER TABLE public.events ADD COLUMN is_test_mode BOOLEAN DEFAULT true;
+    END IF;
 
     -- Tickets Seating
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='seat_id') THEN
