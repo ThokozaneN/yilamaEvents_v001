@@ -324,6 +324,7 @@ export const AboutView: React.FC = () => {
                             <span className="text-white dark:text-black font-bold text-base italic">Y</span>
                         </div>
                         <span className="text-sm font-bold tracking-tight uppercase themed-text">Yilama</span>
+                        <span className="text-[7px] font-black px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 themed-text opacity-30 ml-1">BETA</span>
                     </div>
                     <div className="flex gap-10 text-[10px] font-black uppercase tracking-widest">
                         <a href="#" className="hover:text-amber-500 transition-colors">Privacy</a>

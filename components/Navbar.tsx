@@ -36,6 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, o
             <span className="text-white font-bold text-base sm:text-lg italic">Y</span>
           </div>
           <span className="text-xs sm:text-sm font-bold tracking-tight uppercase themed-text">Yilama</span>
+          <span className="text-[7px] font-black px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 themed-text opacity-40 ml-1">BETA</span>
         </div>
 
         <div className="flex items-center gap-4 sm:gap-6">

@@ -206,8 +206,9 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
         <div className="relative z-10 max-w-lg space-y-8">
-          <h1 className="text-7xl font-black tracking-tighter leading-none text-black dark:text-white">
+          <h1 className="text-7xl font-black tracking-tighter leading-none text-black dark:text-white relative">
             THE<br />EVENT<br />STANDARD.
+            <span className="absolute -top-6 left-0 text-[10px] font-black uppercase tracking-[0.4em] opacity-20">Production Beta</span>
           </h1>
           <p className="text-xl font-medium opacity-60 max-w-md">
             Join the platform redefining live experiences using secure, blockchain-verified ticketing.

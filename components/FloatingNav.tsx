@@ -85,8 +85,9 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({ currentView, user, onN
     >
       <nav
         ref={navRef}
-        className="pointer-events-auto bg-white/80 dark:bg-black/80 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] rounded-[2.5rem] px-4 py-2 flex items-center gap-1 transition-all duration-300"
+        className="pointer-events-auto bg-white/80 dark:bg-black/80 backdrop-blur-2xl border border-white/20 dark:border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] rounded-[2.5rem] px-4 py-2 flex items-center gap-1 transition-all duration-300 relative"
       >
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-[0.3em] themed-text opacity-20 whitespace-nowrap">Release Beta</div>
         <NavItem
           view="home"
           label="Explore"
