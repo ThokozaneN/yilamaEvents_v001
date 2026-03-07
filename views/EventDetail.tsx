@@ -298,7 +298,7 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
                 {isProcessing ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-3 border-current border-t-transparent rounded-full animate-spin" /> : (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                    <span>Checkout — R{totalPrice}</span>
+                    <span>Purchase Now — R{totalPrice}</span>
                   </>
                 )}
               </button>
@@ -564,7 +564,7 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
                     }}
                     className="w-full md:w-auto px-12 py-6 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold text-sm uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-4"
                   >
-                    <span>{event.is_seated ? 'Select Seats' : `Get Tickets — R${totalPrice}`}</span>
+                    <span>{event.is_seated ? 'Select Seats' : `Buy Tickets — R${totalPrice}`}</span>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                   </button>
                 </div>
