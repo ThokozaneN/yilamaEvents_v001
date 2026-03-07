@@ -10,7 +10,7 @@ interface NavbarProps {
   unreadCount?: number;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ user, onNavigate, onLogout, unreadCount = 0 }) => {
+export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, onLogout, unreadCount = 0 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -38,7 +38,15 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onNavigate, onLogout, unre
           <span className="text-xs sm:text-sm font-bold tracking-tight uppercase themed-text">Yilama</span>
         </div>
 
-        {/* Centered Nav Links (Future Placeholder or move menus here) */}
+        {/* Centered Nav Links */}
+        <nav className="hidden md:flex items-center gap-8 ml-10">
+          <button
+            onClick={() => onNavigate('about')}
+            className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:opacity-100 ${currentView === 'about' ? 'themed-text opacity-100' : 'themed-text opacity-40'}`}
+          >
+            Vision
+          </button>
+        </nav>
 
         <div className="flex items-center gap-4 sm:gap-6">
           {user ? (

@@ -41,6 +41,7 @@ const SettingsView = lazyWithRetry(() => import('./views/Settings.tsx').then(m =
 const ResaleMarketplaceView = lazyWithRetry(() => import('./views/ResaleMarketplace.tsx').then(m => ({ default: m.ResaleMarketplaceView })));
 const ExperiencesMarketplaceView = lazyWithRetry(() => import('./views/ExperiencesMarketplace.tsx').then(m => ({ default: m.ExperiencesMarketplaceView })));
 const NotificationsView = lazyWithRetry(() => import('./views/Notifications.tsx').then(m => ({ default: m.NotificationsView })));
+const AboutView = lazyWithRetry(() => import('./views/About.tsx').then(m => ({ default: m.AboutView })));
 
 export type ThemeType = 'light' | 'dark' | 'matte-black';
 
@@ -131,7 +132,7 @@ export default function App() {
 
     // Check auth for protected routes first
     const isPaymentSuccess = new URLSearchParams(window.location.search).get('payment') === 'success';
-    const publicViews = ['home', 'eventDetail', 'auth', 'resale', 'experiences'];
+    const publicViews = ['home', 'eventDetail', 'auth', 'resale', 'about', 'experiences'];
     if (isPaymentSuccess) publicViews.push('wallet');
 
     if (!activeUser && !publicViews.includes(view)) {
@@ -697,6 +698,7 @@ export default function App() {
               onToggleAccessibility={toggleAccessibility}
             />
           )}
+          {currentView === 'about' && <AboutView />}
           {currentView === 'resale' && (
             <ResaleMarketplaceView
               user={user}

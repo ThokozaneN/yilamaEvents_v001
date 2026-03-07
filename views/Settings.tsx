@@ -22,6 +22,7 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [bankingOpen, setBankingOpen] = useState(false); // Collapsible banking details
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   // Financial Data State — loaded live from Supabase
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -255,6 +256,7 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
       }
 
       if (onUpdateProfile) onUpdateProfile(updates);
+      setIsEditingProfile(false);
       alert("Profile Updated Successfully.");
     } catch (err: any) {
       alert(err.message || "Failed to update profile.");
@@ -330,8 +332,8 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
                   </div>
                 </div>
 
-                {/* Avatar Upload */}
-                <div className="flex justify-center relative z-10">
+                {/* Avatar & Edit Button */}
+                <div className="flex flex-col items-center gap-6 relative z-10">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                     <div className={`w-32 h-32 rounded-full border-4 ${user?.avatar_url ? 'border-black dark:border-white' : 'border-dashed border-zinc-300 dark:border-zinc-700'} overflow-hidden flex items-center justify-center transition-all group-hover:scale-105 group-hover:border-black dark:group-hover:border-white bg-zinc-100 dark:bg-white/5`}>
                       {user?.avatar_url ? (
@@ -350,198 +352,239 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
                     </div>
                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
                   </div>
+
+                  {!isEditingProfile && (
+                    <button
+                      onClick={() => setIsEditingProfile(true)}
+                      className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all"
+                    >
+                      Edit Identity
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Full Name</label>
-                  <input
-                    className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Email Address</label>
-                  <input
-                    readOnly
-                    className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text opacity-50 cursor-not-allowed border themed-border"
-                    value={user?.email}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Phone Number</label>
-                  <input
-                    className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
-                    placeholder="+27..."
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-
-                {user?.role === UserRole.ORGANIZER && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Business Name</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
-                        value={formData.business_name}
-                        onChange={e => setFormData({ ...formData, business_name: e.target.value })}
-                      />
+              {!isEditingProfile ? (
+                /* READ ONLY VIEW */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10 opacity-60 grayscale transition-all duration-700">
+                  <div className="space-y-1 p-5 rounded-[1.5rem] bg-zinc-50 dark:bg-white/5 border themed-border">
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">Full Name</p>
+                    <p className="font-bold themed-text">{user?.name || '—'}</p>
+                  </div>
+                  <div className="space-y-1 p-5 rounded-[1.5rem] bg-zinc-50 dark:bg-white/5 border themed-border">
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">Email Address</p>
+                    <p className="font-bold themed-text">{user?.email || '—'}</p>
+                  </div>
+                  <div className="space-y-1 p-5 rounded-[1.5rem] bg-zinc-50 dark:bg-white/5 border themed-border">
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">Phone Number</p>
+                    <p className="font-bold themed-text">{user?.phone || '—'}</p>
+                  </div>
+                  {user?.role === UserRole.ORGANIZER && (
+                    <div className="space-y-1 p-5 rounded-[1.5rem] bg-zinc-50 dark:bg-white/5 border themed-border">
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">Business Name</p>
+                      <p className="font-bold themed-text">{user?.business_name || '—'}</p>
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">SA ID Number</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
-                        placeholder="13 Digits"
-                        value={formData.id_number}
-                        onChange={e => setFormData({ ...formData, id_number: e.target.value })}
-                        maxLength={13}
-                      />
-                      <p className="text-[8px] opacity-30 mt-2 ml-4 uppercase tracking-wider font-bold themed-text">Required for KYC & Payouts</p>
-                    </div>
+                  )}
+                </div>
+              ) : (
+                /* EDITING FORM */
+                <form onSubmit={handleUpdate} className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Full Name</label>
+                    <input
+                      className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
+                      value={formData.name}
+                      onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
 
-                    {/* Verification Documents Upload Section */}
-                    <div className="md:col-span-2 pt-8 border-t themed-border space-y-6">
-                      <div className="space-y-1">
-                        <h4 className="text-lg font-black uppercase tracking-tight themed-text">Verification Documents</h4>
-                        <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] themed-text">Upload secure PDFs for KYC</p>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Email Address</label>
+                    <input
+                      readOnly
+                      className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text opacity-50 cursor-not-allowed border themed-border"
+                      value={user?.email}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Phone Number</label>
+                    <input
+                      className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
+                      placeholder="+27..."
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+
+                  {user?.role === UserRole.ORGANIZER && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Business Name</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
+                          value={formData.business_name}
+                          onChange={e => setFormData({ ...formData, business_name: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">SA ID Number</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all focus:ring-1 focus:ring-black/5"
+                          placeholder="13 Digits"
+                          value={formData.id_number}
+                          onChange={e => setFormData({ ...formData, id_number: e.target.value })}
+                          maxLength={13}
+                        />
+                        <p className="text-[8px] opacity-30 mt-2 ml-4 uppercase tracking-wider font-bold themed-text">Required for KYC & Payouts</p>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* ID Document */}
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Owner ID Document</label>
-                          <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.id_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
-                            {user?.id_proof_url ? (
-                              <div className="text-green-500">
-                                <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
-                              </div>
-                            ) : (
-                              <>
-                                <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                                <button type="button" onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'application/pdf,image/*';
-                                  input.onchange = (e: any) => handleDocumentUpload(e, 'id_proof_url');
-                                  input.click();
-                                }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Browse Files</button>
-                              </>
-                            )}
-                          </div>
+                      {/* Verification Documents Upload Section */}
+                      <div className="md:col-span-2 pt-8 border-t themed-border space-y-6">
+                        <div className="space-y-1">
+                          <h4 className="text-lg font-black uppercase tracking-tight themed-text">Verification Documents</h4>
+                          <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] themed-text">Upload secure PDFs for KYC</p>
                         </div>
 
-                        {/* Company Registration */}
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Company Reg Document</label>
-                          <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.organization_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
-                            {user?.organization_proof_url ? (
-                              <div className="text-green-500">
-                                <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
-                              </div>
-                            ) : (
-                              <>
-                                <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <button type="button" onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'application/pdf,image/*';
-                                  input.onchange = (e: any) => handleDocumentUpload(e, 'organization_proof_url');
-                                  input.click();
-                                }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Upload CIPC</button>
-                              </>
-                            )}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* ID Document */}
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Owner ID Document</label>
+                            <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.id_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
+                              {user?.id_proof_url ? (
+                                <div className="text-green-500">
+                                  <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                  <button type="button" onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'application/pdf,image/*';
+                                    input.onchange = (e: any) => handleDocumentUpload(e, 'id_proof_url');
+                                    input.click();
+                                  }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Browse Files</button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Proof of Address */}
-                        <div className="space-y-3">
-                          <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Proof of Address</label>
-                          <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.address_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
-                            {user?.address_proof_url ? (
-                              <div className="text-green-500">
-                                <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
-                              </div>
-                            ) : (
-                              <>
-                                <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                                <button type="button" onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'application/pdf,image/*';
-                                  input.onchange = (e: any) => handleDocumentUpload(e, 'address_proof_url');
-                                  input.click();
-                                }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Recent Utility Bill</button>
-                              </>
-                            )}
+                          {/* Company Registration */}
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Company Reg Document</label>
+                            <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.organization_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
+                              {user?.organization_proof_url ? (
+                                <div className="text-green-500">
+                                  <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                  <button type="button" onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'application/pdf,image/*';
+                                    input.onchange = (e: any) => handleDocumentUpload(e, 'organization_proof_url');
+                                    input.click();
+                                  }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Upload CIPC</button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Proof of Address */}
+                          <div className="space-y-3">
+                            <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2 themed-text">Proof of Address</label>
+                            <div className={`p-6 border-2 border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 text-center transition-all ${user?.address_proof_url ? 'border-green-500/50 bg-green-500/5' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:border-black dark:hover:border-white'}`}>
+                              {user?.address_proof_url ? (
+                                <div className="text-green-500">
+                                  <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest mt-2 block">Uploaded</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                                  <button type="button" onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'application/pdf,image/*';
+                                    input.onchange = (e: any) => handleDocumentUpload(e, 'address_proof_url');
+                                    input.click();
+                                  }} className="text-[10px] font-black uppercase tracking-widest underline opacity-60 hover:opacity-100">Recent Utility Bill</button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
 
-                {/* Social Media Links */}
-                <div className="md:col-span-2 pt-8 border-t themed-border">
-                  <h4 className="text-lg font-black uppercase tracking-tight themed-text mb-6">Social Connections</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Instagram</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
-                        placeholder="@username"
-                        value={formData.instagram_handle}
-                        onChange={e => setFormData({ ...formData, instagram_handle: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Twitter / X</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
-                        placeholder="@username"
-                        value={formData.twitter_handle}
-                        onChange={e => setFormData({ ...formData, twitter_handle: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Facebook</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
-                        placeholder="page.name"
-                        value={formData.facebook_handle}
-                        onChange={e => setFormData({ ...formData, facebook_handle: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Website</label>
-                      <input
-                        className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
-                        placeholder="https://..."
-                        value={formData.website_url}
-                        onChange={e => setFormData({ ...formData, website_url: e.target.value })}
-                      />
+                  {/* Social Media Links */}
+                  <div className="md:col-span-2 pt-8 border-t themed-border">
+                    <h4 className="text-lg font-black uppercase tracking-tight themed-text mb-6">Social Connections</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Instagram</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
+                          placeholder="@username"
+                          value={formData.instagram_handle}
+                          onChange={e => setFormData({ ...formData, instagram_handle: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Twitter / X</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
+                          placeholder="@username"
+                          value={formData.twitter_handle}
+                          onChange={e => setFormData({ ...formData, twitter_handle: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Facebook</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
+                          placeholder="page.name"
+                          value={formData.facebook_handle}
+                          onChange={e => setFormData({ ...formData, facebook_handle: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4 themed-text">Website</label>
+                        <input
+                          className="w-full themed-secondary-bg p-5 rounded-[1.5rem] font-bold themed-text outline-none border themed-border focus:border-black dark:focus:border-white transition-all"
+                          placeholder="https://..."
+                          value={formData.website_url}
+                          onChange={e => setFormData({ ...formData, website_url: e.target.value })}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="md:col-span-2 pt-4">
-                  <button type="submit" disabled={isUpdating} className="w-full py-6 bg-black dark:bg-white text-white dark:text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-4 hover:shadow-2xl">
-                    {isUpdating ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (
-                      <>
-                        <span>Save Changes</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+                  <div className="md:col-span-2 pt-4 flex gap-4">
+                    <button type="submit" disabled={isUpdating} className="flex-[2] py-6 bg-black dark:bg-white text-white dark:text-black rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-4 hover:shadow-2xl">
+                      {isUpdating ? <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" /> : (
+                        <>
+                          <span>Save Changes</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingProfile(false)}
+                      className="flex-1 py-6 bg-zinc-200 dark:bg-white/10 themed-text rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] active:scale-[0.98] transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </section>
           </div>
         )
