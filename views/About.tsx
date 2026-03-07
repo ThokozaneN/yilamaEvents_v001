@@ -236,7 +236,7 @@ export const AboutView: React.FC = () => {
 
                     <div className="space-y-16">
                         <div className="space-y-8">
-                            <h2 className="text-sm font-black text-amber-500 uppercase tracking-[0.6em]">manifest</h2>
+                            <h2 className="text-sm font-black text-amber-500 uppercase tracking-[0.6em]">Connect</h2>
                             <h3 className="text-7xl md:text-[8vw] font-black text-white leading-[0.85] uppercase italic tracking-tighter">Start <br /> The Wave.</h3>
                             <p className="text-xl text-white/40 font-medium max-w-md">Organizers, entrepreneurs, and seekers—reach out and join the guild.</p>
                         </div>
@@ -248,7 +248,7 @@ export const AboutView: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Digital Mail</p>
-                                    <p className="text-lg font-bold text-white">hello@yilama.events</p>
+                                    <p className="text-lg font-bold text-white">info@yilama.co.za</p>
                                 </div>
                             </div>
                             <div className="magnetic-item group/item cursor-pointer space-y-4">
@@ -257,7 +257,7 @@ export const AboutView: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Connect Directly</p>
-                                    <p className="text-lg font-bold text-white">+27 11 456 7890</p>
+                                    <p className="text-lg font-bold text-white">+27 69 807 7866</p>
                                 </div>
                             </div>
                             <div className="magnetic-item group/item cursor-pointer space-y-4 lg:col-span-2">
@@ -266,7 +266,7 @@ export const AboutView: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Central Hub</p>
-                                    <p className="text-lg font-bold text-white">Sandton, Johannesburg, RSA</p>
+                                    <p className="text-lg font-bold text-white">Secunda, Mpumalanga</p>
                                 </div>
                             </div>
                         </div>
@@ -288,7 +288,7 @@ export const AboutView: React.FC = () => {
                                     <input className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-2xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all placeholder:text-white/10" placeholder="Your Name / Organization" />
                                 </div>
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">Manifest Intent</label>
+                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">Reason for Contact</label>
                                     <div className="relative">
                                         <select className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-2xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all appearance-none cursor-pointer">
                                             <option className="bg-zinc-900">Partnership Pursuit</option>
@@ -302,12 +302,12 @@ export const AboutView: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">The Declaration</label>
+                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">Message</label>
                                     <textarea rows={4} className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-3xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all placeholder:text-white/10 resize-none" placeholder="Describe your vision..." />
                                 </div>
                             </div>
                             <button className="magnetic-item w-full py-8 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-[0.6em] shadow-2xl hover:bg-amber-500 transition-all flex items-center justify-center gap-4">
-                                <span>Initiate Protocol</span>
+                                <span>Send Message</span>
                                 <Zap className="w-4 h-4 fill-current" />
                             </button>
                         </div>
@@ -319,16 +319,18 @@ export const AboutView: React.FC = () => {
             {/* Sub-Footer Branding */}
             <footer className="py-20 border-t themed-border opacity-30">
                 <div className="px-6 flex flex-col md:flex-row justify-between items-center gap-12 max-w-7xl mx-auto">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-black dark:bg-white rounded-xl" />
-                        <h4 className="text-xl font-black themed-text italic uppercase font-serif tracking-widest">Yilama</h4>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <div className="w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center shadow-sm">
+                            <span className="text-white dark:text-black font-bold text-base italic">Y</span>
+                        </div>
+                        <span className="text-sm font-bold tracking-tight uppercase themed-text">Yilama</span>
                     </div>
                     <div className="flex gap-10 text-[10px] font-black uppercase tracking-widest">
                         <a href="#" className="hover:text-amber-500 transition-colors">Privacy</a>
                         <a href="#" className="hover:text-amber-500 transition-colors">Terms</a>
                         <a href="#" className="hover:text-amber-500 transition-colors">Systems</a>
                     </div>
-                    <p className="text-[10px] font-bold themed-text uppercase tracking-widest">© 2026 RSA • Engineered Globally</p>
+                    <p className="text-[10px] font-bold themed-text uppercase tracking-widest">© 2026 RSA • Yilama Events</p>
                 </div>
             </footer>
         </div>
