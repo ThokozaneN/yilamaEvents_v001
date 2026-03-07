@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Event, Ticket, UserRole, Profile, EventCategory, FinancialSummary } from '../types';
-import { CheckCircle2, XCircle, Sparkles, Rocket, DollarSign, LineChart, Landmark, RefreshCw, Lock, AlertCircle, Calendar, ShoppingBag, BarChart3, Users, User } from 'lucide-react';
+import { CheckCircle2, XCircle, Sparkles, Rocket, DollarSign, LineChart, Landmark, RefreshCw, Lock, AlertCircle, Calendar, ShoppingBag, BarChart3, Users, User, ArrowRight } from 'lucide-react';
 import { EventCreationWizard } from './EventCreationWizard';
 import { SubscriptionModal } from '../components/SubscriptionModal';
 import { EditEventModal } from '../components/EditEventModal';
