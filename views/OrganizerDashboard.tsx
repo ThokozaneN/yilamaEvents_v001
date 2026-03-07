@@ -724,43 +724,77 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
                           </div>
                         </div>
 
-                        {/* Action Buttons */}
+                        {/* Action Buttons or Performance Recap */}
                         <div className="px-6 pb-6 flex flex-col gap-2">
-                          {e.status === 'published' && (
-                            <button
-                              onClick={(e_inner) => {
-                                e_inner.stopPropagation();
-                                setVenueBuilderEventId(e.id);
-                              }}
-                              className="w-full py-2.5 rounded-2xl bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-lg flex items-center justify-center gap-2"
-                            >
-                              <span className="flex items-center gap-2"><Rocket className="w-4 h-4" /> Venue Builder</span>
-                            </button>
+                          {eventViewTab === 'active' ? (
+                            <>
+                              {e.status === 'published' && (
+                                <button
+                                  onClick={(e_inner) => {
+                                    e_inner.stopPropagation();
+                                    setVenueBuilderEventId(e.id);
+                                  }}
+                                  className="w-full py-2.5 rounded-2xl bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-500 transition-all shadow-lg flex items-center justify-center gap-2"
+                                >
+                                  <span className="flex items-center gap-2"><Rocket className="w-4 h-4" /> Venue Builder</span>
+                                </button>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    setEditingEvent(e);
+                                  }}
+                                  className="flex-1 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 text-[10px] font-black uppercase tracking-widest themed-text hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-transparent transition-all"
+                                >
+                                  Edit
+                                </button>
+                                {deletingEventId === e.id ? (
+                                  <button
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      handleDeleteEvent(e.id);
+                                    }}
+                                    disabled={isDeleting}
+                                    className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-600 disabled:opacity-50"
+                                  >
+                                    {isDeleting ? 'Deleting...' : 'Confirm'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={(ev) => {
+                                      ev.stopPropagation();
+                                      setDeletingEventId(e.id);
+                                    }}
+                                    className="flex-1 py-2.5 rounded-2xl border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="mt-2 p-4 rounded-2xl bg-zinc-50 dark:bg-white/5 border border-dashed themed-border space-y-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">Performance Recap</span>
+                                <CheckCircle2 className="w-3 h-3 text-green-500" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-[8px] font-black uppercase tracking-tighter opacity-30 themed-text">Net Payout</p>
+                                  <p className="text-xs font-black themed-text">
+                                    R {analyticsData?.revenue?.find(r => r.event_id === e.id)?.net_revenue?.toLocaleString() || '0'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] font-black uppercase tracking-tighter opacity-30 themed-text">Check-in</p>
+                                  <p className="text-xs font-black themed-text">
+                                    {analyticsData?.funnel?.find(f => f.event_id === e.id)?.check_in_rate || 0}%
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
                           )}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setEditingEvent(e)}
-                              className="flex-1 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 text-[10px] font-black uppercase tracking-widest themed-text hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-transparent transition-all"
-                            >
-                              Edit
-                            </button>
-                            {deletingEventId === e.id ? (
-                              <button
-                                onClick={() => handleDeleteEvent(e.id)}
-                                disabled={isDeleting}
-                                className="flex-1 py-2.5 rounded-2xl bg-red-500 text-white text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-600 disabled:opacity-50"
-                              >
-                                {isDeleting ? 'Deleting...' : 'Confirm'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setDeletingEventId(e.id)}
-                                className="flex-1 py-2.5 rounded-2xl border border-red-500/30 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
                         </div>
                       </div>
 
