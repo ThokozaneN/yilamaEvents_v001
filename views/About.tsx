@@ -109,8 +109,6 @@ export const AboutView: React.FC = () => {
         <div ref={containerRef} className="min-h-screen themed-bg overflow-x-hidden selection:bg-amber-500 selection:text-black font-sans">
             {/* Immersive Background Canvas */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-                <div className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] bg-amber-500/5 rounded-full blur-[120px] animate-[pulse_8s_infinite]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-purple-500/5 rounded-full blur-[150px] animate-[pulse_10s_infinite_1s]" />
                 {/* Animated Grid Lines */}
                 <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
                     style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
@@ -283,30 +281,34 @@ export const AboutView: React.FC = () => {
                     </div>
 
                     <div className="relative">
-                        <div className="absolute inset-0 bg-amber-500 blur-[80px] opacity-10 animate-pulse pointer-events-none" />
-                        <div className="relative bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[4rem] p-16 space-y-10 shadow-2xl">
-                            <div className="space-y-6">
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase text-white/20 tracking-widest ml-4">Entity Identity</label>
-                                    <input className="w-full bg-white/5 border-none p-6 rounded-[2rem] text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 transition-all placeholder:text-white/10" placeholder="Full Name or Org" />
+                        <div className="relative bg-zinc-950/50 backdrop-blur-3xl border border-white/5 rounded-[3rem] p-12 space-y-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
+                            <div className="space-y-8">
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">Identity</label>
+                                    <input className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-2xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all placeholder:text-white/10" placeholder="Your Name / Organization" />
                                 </div>
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase text-white/20 tracking-widest ml-4">The Inquiry</label>
-                                    <select className="w-full bg-white/5 border-none p-6 rounded-[2rem] text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 transition-all appearance-none cursor-pointer">
-                                        <option>Partnership Pursuit</option>
-                                        <option>Organizer Studio Support</option>
-                                        <option>Secondary Market Dispute</option>
-                                        <option>Media & General</option>
-                                    </select>
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">Manifest Intent</label>
+                                    <div className="relative">
+                                        <select className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-2xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all appearance-none cursor-pointer">
+                                            <option className="bg-zinc-900">Partnership Pursuit</option>
+                                            <option className="bg-zinc-900">Organizer Studio Support</option>
+                                            <option className="bg-zinc-900">Secondary Market Dispute</option>
+                                            <option className="bg-zinc-900">Media & General</option>
+                                        </select>
+                                        <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
+                                            <ArrowRight className="w-4 h-4 rotate-90" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase text-white/20 tracking-widest ml-4">Manifesto (Message)</label>
-                                    <textarea rows={4} className="w-full bg-white/5 border-none p-6 rounded-[2.5rem] text-white font-bold outline-none focus:ring-1 focus:ring-amber-500 transition-all placeholder:text-white/10" placeholder="Declare your intent..." />
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black uppercase text-amber-500/50 tracking-[0.3em] ml-2">The Declaration</label>
+                                    <textarea rows={4} className="w-full bg-white/[0.03] border border-white/5 p-6 rounded-3xl text-white font-medium outline-none focus:border-amber-500/50 focus:bg-white/[0.05] transition-all placeholder:text-white/10 resize-none" placeholder="Describe your vision..." />
                                 </div>
                             </div>
-                            <button className="magnetic-item w-full py-10 bg-amber-500 text-black rounded-[2.5rem] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-4">
-                                <span>Send Protocol</span>
-                                <Zap className="w-5 h-5 fill-current" />
+                            <button className="magnetic-item w-full py-8 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-[0.6em] shadow-2xl hover:bg-amber-500 transition-all flex items-center justify-center gap-4">
+                                <span>Initiate Protocol</span>
+                                <Zap className="w-4 h-4 fill-current" />
                             </button>
                         </div>
                     </div>
