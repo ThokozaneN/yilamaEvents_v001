@@ -32,11 +32,14 @@ const TicketCard: React.FC<{ group: TicketGroup; onClick: (ticket: Ticket) => vo
   const ticket = group.tickets[0]; // representative ticket
   if (!ticket) return null; // Defensive guard
   const hasImage = !!ticket.event?.image_url;
+  const now = new Date();
+  const endsAt = ticket.event?.ends_at ? new Date(ticket.event.ends_at) : (ticket.event?.starts_at ? new Date(new Date(ticket.event.starts_at).getTime() + 6 * 60 * 60 * 1000) : null);
+  const isPastEvent = endsAt && now > endsAt;
 
   return (
     <div
       onClick={() => onClick(ticket)}
-      className="cursor-pointer group select-none"
+      className={`cursor-pointer group select-none transition-all duration-500 ${isPastEvent ? 'grayscale opacity-60 scale-95' : ''}`}
       style={{ perspective: '1000px' }}
     >
       {/* Stack shadow for multiple tickets */}
@@ -111,9 +114,9 @@ const TicketCard: React.FC<{ group: TicketGroup; onClick: (ticket: Ticket) => vo
         {/* Bottom status bar */}
         <div className="px-5 pb-4 flex items-center justify-between">
           <div className="absolute top-4 right-4 z-10">
-            <div className={`backdrop-blur-md px-2 py-1 rounded text-[10px] items-center gap-1.5 flex uppercase font-bold tracking-wider ${ticket.status === TicketStatus.USED ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400'}`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${ticket.status === TicketStatus.USED ? 'bg-amber-500' : 'bg-green-500 animate-pulse'}`} />
-              {ticket.status === TicketStatus.USED ? 'Entry Proof' : ticket.status}
+            <div className={`backdrop-blur-md px-2 py-1 rounded text-[10px] items-center gap-1.5 flex uppercase font-bold tracking-wider ${isPastEvent ? 'bg-zinc-500/20 text-zinc-400' : ticket.status === TicketStatus.USED ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isPastEvent ? 'bg-zinc-500' : ticket.status === TicketStatus.USED ? 'bg-amber-500' : 'bg-green-500 animate-pulse'}`} />
+              {isPastEvent ? 'Past Event' : ticket.status === TicketStatus.USED ? 'Entry Proof' : ticket.status}
             </div>
           </div>
           <svg className="w-4 h-4 opacity-30 themed-text group-hover:opacity-70 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +146,11 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
   const allValidTickets = useMemo(() => {
     const now = new Date();
     return tickets.filter(t => {
-      if (t.status === TicketStatus.VALID) return true;
+      if (t.status === TicketStatus.VALID) {
+        const endsAt = t.event?.ends_at ? new Date(t.event.ends_at) : (t.event?.starts_at ? new Date(new Date(t.event.starts_at).getTime() + 6 * 60 * 60 * 1000) : null);
+        if (endsAt && now.getTime() - endsAt.getTime() > 12 * 60 * 60 * 1000) return false;
+        return true;
+      }
       if (t.status === TicketStatus.USED && t.used_at) {
         const usedTime = new Date(t.used_at).getTime();
         const twelveHoursInMs = 12 * 60 * 60 * 1000;
@@ -219,7 +226,12 @@ export const WalletView: React.FC<{ user: Profile; tickets: Ticket[]; onNavigate
   const ticketGroups = useMemo<TicketGroup[]>(() => {
     const now = new Date();
     const valid = tickets.filter(t => {
-      if (t.status === TicketStatus.VALID) return true;
+      if (t.status === TicketStatus.VALID) {
+        // Even if valid, don't show if event ended > 12h ago
+        const endsAt = t.event?.ends_at ? new Date(t.event.ends_at) : (t.event?.starts_at ? new Date(new Date(t.event.starts_at).getTime() + 6 * 60 * 60 * 1000) : null);
+        if (endsAt && now.getTime() - endsAt.getTime() > 12 * 60 * 60 * 1000) return false;
+        return true;
+      }
       if (t.status === TicketStatus.USED && t.used_at) {
         const usedTime = new Date(t.used_at).getTime();
         const twelveHoursInMs = 12 * 60 * 60 * 1000;

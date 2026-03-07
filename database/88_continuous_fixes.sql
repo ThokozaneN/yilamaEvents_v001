@@ -1,0 +1,108 @@
+-- =============================================================================
+-- 88_CONTINUOUS_FIXES.SQL
+-- Consolidated file for all subsequent database fixes and enhancements.
+-- =============================================================================
+
+-- 1. UNIFY NOTIFICATIONS TABLE
+-- Ensure as many places as possible use 'app_notifications' as the source of truth.
+-- We'll create a view 'notifications' for backward compatibility if it doesn't already exist.
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications' AND table_type = 'VIEW') 
+    AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'app_notifications' AND table_type = 'BASE TABLE') THEN
+        -- If 'notifications' is a table, we leave it for now to avoid data loss, 
+        -- but if it's missing, we make it a view of app_notifications.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications') THEN
+            CREATE VIEW public.notifications AS SELECT * FROM public.app_notifications;
+        END IF;
+    END IF;
+END $$;
+
+-- 2. TICKET DELETION GRACE PERIOD
+-- Function to clean up tickets 12 hours after the event ends.
+CREATE OR REPLACE FUNCTION public.cleanup_expired_tickets()
+RETURNS void AS $$
+BEGIN
+    -- Delete tickets where the event ended more than 12 hours ago
+    -- We join with events to get the ends_at or fallback to starts_at + 6h
+    DELETE FROM public.tickets
+    WHERE id IN (
+        SELECT t.id
+        FROM public.tickets t
+        JOIN public.events e ON t.event_id = e.id
+        WHERE COALESCE(e.ends_at, e.starts_at + INTERVAL '6 hours') < (now() - INTERVAL '12 hours')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. NOTIFICATION TRIGGERS FOR UPCOMING EVENTS
+-- This RPC will be called by an Edge Function cron job.
+CREATE OR REPLACE FUNCTION public.generate_upcoming_event_notifications()
+RETURNS TABLE (user_id uuid, event_id uuid, event_title text, email text) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT 
+        t.owner_user_id AS user_id, 
+        e.id AS event_id, 
+        e.title AS event_title,
+        p.email
+    FROM public.tickets t
+    JOIN public.events e ON t.event_id = e.id
+    JOIN public.profiles p ON t.owner_user_id = p.id
+    WHERE e.starts_at > now() 
+      AND e.starts_at < (now() + INTERVAL '24 hours')
+      AND t.status = 'valid'
+      -- Avoid duplicate in-app notifications
+      AND NOT EXISTS (
+          SELECT 1 FROM public.app_notifications n 
+          WHERE n.user_id = t.owner_user_id 
+          AND n.type = 'event_update'
+          AND n.action_url = '/events/' || e.id
+          AND n.created_at > (now() - INTERVAL '48 hours')
+      );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 4. UNUSED TICKET REMINDERS (For events currently happening)
+CREATE OR REPLACE FUNCTION public.generate_unused_ticket_notifications()
+RETURNS TABLE (user_id uuid, event_id uuid, event_title text) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT 
+        t.owner_user_id AS user_id, 
+        e.id AS event_id, 
+        e.title AS event_title
+    FROM public.tickets t
+    JOIN public.events e ON t.event_id = e.id
+    WHERE e.starts_at <= now() 
+      AND COALESCE(e.ends_at, e.starts_at + INTERVAL '6 hours') > now()
+      AND t.status = 'valid' -- Valid means NOT yet used
+      AND NOT EXISTS (
+          SELECT 1 FROM public.app_notifications n 
+          WHERE n.user_id = t.owner_user_id 
+          AND n.title LIKE 'Ticket Waiting%'
+          AND n.created_at > (now() - INTERVAL '24 hours')
+      );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5. TICKET EXPIRATION NOTIFICATIONS (For events that just ended)
+CREATE OR REPLACE FUNCTION public.generate_expired_ticket_notifications()
+RETURNS TABLE (user_id uuid, event_id uuid, event_title text) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT 
+        t.owner_user_id AS user_id, 
+        e.id AS event_id, 
+        e.title AS event_title
+    FROM public.tickets t
+    JOIN public.events e ON t.event_id = e.id
+    WHERE COALESCE(e.ends_at, e.starts_at + INTERVAL '6 hours') BETWEEN (now() - INTERVAL '12 hours') AND now()
+      AND NOT EXISTS (
+          SELECT 1 FROM public.app_notifications n 
+          WHERE n.user_id = t.owner_user_id 
+          AND n.title = 'Ticket Expired ⚠️'
+          AND n.created_at > (now() - INTERVAL '24 hours')
+      );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
