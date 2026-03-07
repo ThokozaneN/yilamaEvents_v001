@@ -146,38 +146,70 @@ export const AuthView: React.FC<AuthProps> = ({ onLogin }) => {
         }
 
         if (data.user) {
-          console.log(`[AUTH_AUDIT] Sign-in successful for ${data.user.id}. Fetching profile...`);
+          console.log(`[AUTH_AUDIT] Sign-in successful for ${data.user.id}. Fetching profile with retries...`);
 
-          const profilePromise = (async () => {
-            // 1. Try view
-            const { data: profile } = await supabase
-              .from('v_composite_profiles')
-              .select('*')
-              .eq('id', data.user!.id)
-              .maybeSingle();
+          let profile: Profile | null = null;
+          let lastError: any = null;
+          const maxRetries = 3;
 
-            if (profile) return profile;
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`[AUTH_AUDIT] Profile fetch attempt ${attempt}/${maxRetries}...`);
 
-            // 2. Fallback to basic profiles
-            console.warn("[AUTH_AUDIT] Sign-in fallback to profiles table...");
-            const { data: baseProfile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', data.user!.id)
-              .maybeSingle();
+              const profilePromise = (async () => {
+                // 1. Try view first (security definer view)
+                const { data: p, error: viewError } = await supabase
+                  .from('v_composite_profiles')
+                  .select('*')
+                  .eq('id', data.user!.id)
+                  .maybeSingle();
 
-            return baseProfile;
-          })();
+                if (viewError) {
+                  console.error(`[AUTH_AUDIT] View fetch error (attempt ${attempt}):`, viewError);
+                  throw viewError;
+                }
+                if (p) return p;
 
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Profile query timed out")), 5000)
-          );
+                // 2. Fallback to basic profiles table if view returns nothing
+                console.warn(`[AUTH_AUDIT] View returned nothing. Falling back to profiles table (attempt ${attempt})...`);
+                const { data: bp, error: tableError } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', data.user!.id)
+                  .maybeSingle();
 
-          const profile = await Promise.race([profilePromise, timeoutPromise]) as Profile | null;
+                if (tableError) {
+                  console.error(`[AUTH_AUDIT] Table fetch error (attempt ${attempt}):`, tableError);
+                  throw tableError;
+                }
+                return bp;
+              })();
+
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Profile query timed out")), 4000)
+              );
+
+              profile = await Promise.race([profilePromise, timeoutPromise]) as Profile | null;
+
+              if (profile) {
+                console.log(`[AUTH_AUDIT] Profile found on attempt ${attempt}.`);
+                break;
+              }
+            } catch (err: any) {
+              lastError = err;
+              console.error(`[AUTH_AUDIT] Attempt ${attempt} failed:`, err.message);
+            }
+
+            if (attempt < maxRetries) {
+              console.log(`[AUTH_AUDIT] Retrying in 1s...`);
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
 
           if (!profile) {
-            console.error("[AUTH_AUDIT] Profile not found (Ghost User).");
-            throw new Error("Ghost User Detected: Your Auth account exists, but your Profile is missing.");
+            console.error("[AUTH_AUDIT] Profile not found after retries or permanent error.", lastError);
+            const diagnostics = lastError ? ` Details: ${lastError.message || JSON.stringify(lastError)}` : "";
+            throw new Error(`Ghost User Detected: Your Auth account exists, but your Profile is missing.${diagnostics}`);
           }
           console.log("[AUTH_AUDIT] Profile retrieved. Calling onLogin...");
           onLogin(profile as Profile);

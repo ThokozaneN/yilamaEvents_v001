@@ -115,13 +115,33 @@ create table if not exists organizer_applications (
 -- This function runs securely with definer privileges
 create or replace function public.handle_new_user() 
 returns trigger as $$
+declare
+  is_organizer boolean;
+  final_role user_role;
 begin
-  insert into public.profiles (id, email, role, name)
+  -- Resolve role from metadata (frontend sends 'user' or 'organizer')
+  is_organizer := (new.raw_user_meta_data->>'role' = 'organizer');
+  final_role := case when is_organizer then 'organizer'::user_role else 'attendee'::user_role end;
+
+  insert into public.profiles (
+    id, 
+    email, 
+    role, 
+    name,
+    business_name,
+    phone,
+    organization_phone,
+    organizer_tier
+  )
   values (
     new.id, 
     new.email, 
-    'attendee', -- Default role
-    coalesce(new.raw_user_meta_data->>'full_name', new.email)
+    final_role, 
+    coalesce(new.raw_user_meta_data->>'full_name', new.email),
+    new.raw_user_meta_data->>'business_name',
+    new.raw_user_meta_data->>'phone',
+    new.raw_user_meta_data->>'organization_phone',
+    coalesce(new.raw_user_meta_data->>'organizer_tier', 'free')
   );
   return new;
 end;
