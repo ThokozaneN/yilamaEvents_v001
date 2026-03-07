@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Crown, Zap, Shield, Globe, Users, Heart, Mail, Phone, MapPin, Instagram, Twitter, Facebook } from 'lucide-react';
+import { Crown, Zap, Shield, Globe, Mail, Phone, MapPin, Instagram, Twitter, Facebook } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -42,7 +42,7 @@ export const AboutView: React.FC = () => {
                     end: "bottom bottom",
                     scrub: true
                 },
-                y: (i, target) => {
+                y: (_i, target) => {
                     const speed = target.dataset.speed || 0.2;
                     return -window.innerHeight * speed;
                 },
