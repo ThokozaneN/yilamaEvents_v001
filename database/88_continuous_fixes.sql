@@ -106,3 +106,37 @@ BEGIN
       );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================================================
+-- 5. SYNC EVENT CATEGORY ENUM
+-- =============================================================================
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Nightlife';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Arts & Theatre';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Food & Drink';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Networking';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Lifestyle';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    ALTER TYPE event_category_enum ADD VALUE 'Fashion';
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- =============================================================================
+-- 6. PERFORMANCE INDICES
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS idx_tickets_owner_event ON public.tickets(owner_user_id, event_id);
+CREATE INDEX IF NOT EXISTS idx_events_starts_at ON public.events(starts_at);
+CREATE INDEX IF NOT EXISTS idx_event_categories_name ON public.event_categories(name);

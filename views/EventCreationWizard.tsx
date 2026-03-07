@@ -469,7 +469,8 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                         disabled={isPolishing}
                                         className={`flex items-center gap-2 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${isPolishing ? 'animate-pulse bg-zinc-100 dark:bg-zinc-800 text-zinc-400' : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/20 hover:scale-105 active:scale-95'}`}
                                     >
-                                        <span>{isPolishing ? 'Casting Spell...' : 'Magic Polish <Sparkles className="inline w-3 h-3 ml-1" />'}</span>
+                                        <span>{isPolishing ? 'Casting Spell...' : 'Magic Polish'}</span>
+                                        <Sparkles className="inline w-3 h-3 ml-1" />
                                     </button>
                                 )}
                             </div>
