@@ -166,7 +166,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
 
       // Load analytics views using the new secure RPCs
       const [resRev, resPerf, resFunnel, _resBalance, _resPayouts] = await Promise.allSettled([
-        supabase.rpc('get_organizer_revenue_breakdown'),
+        supabase.rpc('get_organizer_event_ledger'), // Changed from get_organizer_revenue_breakdown
         supabase.rpc('get_ticket_performance'),
         supabase.rpc('get_event_attendance_funnel'),
         supabase.rpc('get_organizer_balance'),
@@ -852,7 +852,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
                   {analyticsData.funnel.map((funnelItem, i) => {
                     // Match event title
                     const eventTitle = events.find(e => e.id === funnelItem.event_id)?.title || 'Unknown Event';
-                    const checkInRate = Math.round(Number(funnelItem.check_in_rate) * 100);
+                    const checkInRate = Math.round(Number(funnelItem.check_in_rate || 0));
 
                     return (
                       <div key={i} className="themed-card border themed-border rounded-[2rem] p-6 space-y-6">
@@ -864,15 +864,15 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs font-bold themed-text">
                             <span>Sold (Unscanned)</span>
-                            <span>{funnelItem.tickets_sold_unscanned}</span>
+                            <span>{Number(funnelItem.tickets_sold || 0) - Number(funnelItem.tickets_scanned_in || 0)}</span>
                           </div>
                           <div className="w-full h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(funnelItem.tickets_sold_unscanned / (funnelItem.tickets_sold_unscanned + funnelItem.tickets_scanned_in) || 0) * 100}% ` }} />
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${((Number(funnelItem.tickets_sold || 0) - Number(funnelItem.tickets_scanned_in || 0)) / Number(funnelItem.tickets_sold || 1)) * 100}% ` }} />
                           </div>
 
                           <div className="flex justify-between text-xs font-bold themed-text pt-2">
                             <span>Scanned In</span>
-                            <span className="text-green-500">{funnelItem.tickets_scanned_in}</span>
+                            <span className="text-green-500">{funnelItem.tickets_scanned_in || 0}</span>
                           </div>
                           <div className="w-full h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                             <div className="h-full bg-green-500 rounded-full" style={{ width: `${checkInRate}% ` }} />

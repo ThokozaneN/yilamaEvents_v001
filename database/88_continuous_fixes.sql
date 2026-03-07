@@ -140,3 +140,74 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE INDEX IF NOT EXISTS idx_tickets_owner_event ON public.tickets(owner_user_id, event_id);
 CREATE INDEX IF NOT EXISTS idx_events_starts_at ON public.events(starts_at);
 CREATE INDEX IF NOT EXISTS idx_event_categories_name ON public.event_categories(name);
+
+-- =============================================================================
+-- 7. ANALYTICS & DASHBOARD ALIGNMENT
+-- =============================================================================
+
+-- Fix get_event_attendance_funnel naming to match frontend
+CREATE OR REPLACE FUNCTION get_event_attendance_funnel()
+RETURNS TABLE (
+    event_id uuid,
+    organizer_id uuid,
+    title text,
+    status text,
+    total_capacity bigint,
+    tickets_sold bigint,
+    tickets_scanned_in bigint, -- Updated name
+    sold_pct numeric,
+    check_in_rate numeric -- Updated name
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        e.id,
+        e.organizer_id,
+        e.title,
+        e.status,
+        COALESCE(SUM(tt.quantity_limit), 0)::bigint,
+        COALESCE(SUM(tt.quantity_sold), 0)::bigint,
+        COUNT(DISTINCT tc.ticket_id)::bigint,
+        CASE
+            WHEN SUM(tt.quantity_limit) > 0
+            THEN ROUND((SUM(tt.quantity_sold)::NUMERIC / NULLIF(SUM(tt.quantity_limit), 0)::NUMERIC) * 100, 1)
+            ELSE 0
+        END,
+        CASE
+            WHEN SUM(tt.quantity_sold) > 0
+            THEN ROUND((COUNT(DISTINCT tc.ticket_id)::NUMERIC / NULLIF(SUM(tt.quantity_sold), 0)::NUMERIC) * 100, 1)
+            ELSE 0
+        END
+    FROM events e
+    LEFT JOIN ticket_types tt ON tt.event_id = e.id
+    LEFT JOIN ticket_checkins tc ON tc.event_id = e.id
+    WHERE e.organizer_id = auth.uid()
+    GROUP BY e.id, e.organizer_id, e.title, e.status;
+END;
+$$;
+
+-- New RPC for the Financial Ledger table in Analytics tab
+CREATE OR REPLACE FUNCTION get_organizer_event_ledger()
+RETURNS TABLE (
+    event_id uuid,
+    event_title text,
+    gross_revenue numeric,
+    total_fees numeric,
+    total_refunds numeric,
+    net_revenue numeric
+) LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        e.id as event_id,
+        e.title as event_title,
+        COALESCE(SUM(CASE WHEN ft.category = 'ticket_sale' AND ft.type = 'credit' THEN ft.amount ELSE 0 END), 0) as gross_revenue,
+        COALESCE(SUM(CASE WHEN ft.category = 'platform_fee' AND ft.type = 'debit' THEN ft.amount ELSE 0 END), 0) as total_fees,
+        COALESCE(SUM(CASE WHEN ft.category = 'refund' AND ft.type = 'debit' THEN ft.amount ELSE 0 END), 0) as total_refunds,
+        COALESCE(SUM(CASE WHEN ft.type = 'credit' THEN ft.amount ELSE -ft.amount END), 0) as net_revenue
+    FROM events e
+    LEFT JOIN financial_transactions ft ON ft.reference_id::text = e.id::text OR ft.reference_id IN (SELECT id FROM orders WHERE event_id = e.id)
+    WHERE e.organizer_id = auth.uid()
+    GROUP BY e.id, e.title;
+END;
+$$;

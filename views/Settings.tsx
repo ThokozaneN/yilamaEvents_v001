@@ -35,51 +35,59 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
     setIsLoadingFinancials(true);
 
     const loadFinancials = async () => {
-      // 1. Real payouts
-      const { data: payoutRows } = await supabase
-        .from('payouts')
-        .select('*')
-        .eq('organizer_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      try {
+        // 1. Real payouts
+        const { data: payoutRows, error: payoutError } = await supabase
+          .from('payouts')
+          .select('*')
+          .eq('organizer_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-      if (payoutRows) setPayouts(payoutRows as Payout[]);
+        if (payoutError) throw payoutError;
+        if (payoutRows) setPayouts(payoutRows as Payout[]);
 
-      // 2. Monthly revenue graph from orders (confirmed payments over past 12 months)
-      const since = new Date();
-      since.setMonth(since.getMonth() - 11);
-      since.setDate(1);
-      since.setHours(0, 0, 0, 0);
+        // 2. Monthly revenue graph from orders (confirmed payments over past 12 months)
+        const since = new Date();
+        since.setMonth(since.getMonth() - 11);
+        since.setDate(1);
+        since.setHours(0, 0, 0, 0);
 
-      const { data: orderRows } = await supabase
-        .from('orders')
-        .select('total_amount, created_at')
-        .eq('status', 'confirmed')
-        .gte('created_at', since.toISOString());
+        const { data: orderRows, error: orderError } = await supabase
+          .from('orders')
+          .select('total_amount, created_at')
+          .eq('status', 'paid') // Changed from 'confirmed' to 'paid' to match ledger system
+          .gte('created_at', since.toISOString());
 
-      // Build 12-month buckets relative to today
-      const months: { label: string; value: number }[] = [];
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        months.push({
-          label: d.toLocaleString('default', { month: 'short' }),
-          value: 0
-        });
-      }
+        if (orderError) throw orderError;
 
-      (orderRows || []).forEach((o: any) => {
-        const d = new Date(o.created_at);
-        const nowD = new Date();
-        const monthsAgo = (nowD.getFullYear() - d.getFullYear()) * 12 + (nowD.getMonth() - d.getMonth());
-        const idx = 11 - monthsAgo;
-        if (idx >= 0 && idx < 12 && months[idx]) {
-          months[idx].value += Number(o.total_amount || 0);
+        // Build 12-month buckets relative to today
+        const months: { label: string; value: number }[] = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          months.push({
+            label: d.toLocaleString('default', { month: 'short' }),
+            value: 0
+          });
         }
-      });
 
-      setGraphData(months);
-      setIsLoadingFinancials(false);
+        (orderRows || []).forEach((o: any) => {
+          const d = new Date(o.created_at);
+          const nowD = new Date();
+          const monthsAgo = (nowD.getFullYear() - d.getFullYear()) * 12 + (nowD.getMonth() - d.getMonth());
+          const idx = 11 - monthsAgo;
+          if (idx >= 0 && idx < 12 && months[idx]) {
+            months[idx].value += Number(o.total_amount || 0);
+          }
+        });
+
+        setGraphData(months);
+      } catch (err) {
+        console.error('Error loading financials:', err);
+      } finally {
+        setIsLoadingFinancials(false);
+      }
     };
 
     loadFinancials();
