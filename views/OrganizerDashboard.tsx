@@ -594,6 +594,12 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
               );
             })}
           </div>
+
+          {/* Mobile Swipe Hint */}
+          <div className="flex sm:hidden items-center gap-2 mt-4 ml-4 opacity-30 animate-pulse">
+            <ArrowRight className="w-3 h-3" />
+            <span className="text-[8px] font-black uppercase tracking-widest">Swipe left for more options</span>
+          </div>
         </div>
       </header>
 
