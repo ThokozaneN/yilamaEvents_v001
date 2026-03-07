@@ -146,6 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_event_categories_name ON public.event_categories(
 -- =============================================================================
 
 -- Fix get_event_attendance_funnel naming to match frontend
+DROP FUNCTION IF EXISTS get_event_attendance_funnel();
 CREATE OR REPLACE FUNCTION get_event_attendance_funnel()
 RETURNS TABLE (
     event_id uuid,
