@@ -30,7 +30,7 @@ serve(async (req) => {
     }
 
     try {
-        const { organizer_id, start_date, end_date } = await req.json()
+        const { organizer_id, event_id, start_date, end_date, export_type = 'mixed' } = await req.json()
 
         if (!PDF_MONKEY_FINANCE_TEMPLATE_ID) {
             throw new Error("PDF_MONKEY_FINANCE_TEMPLATE_ID is not configured in Edge Function secrets.")
@@ -51,8 +51,15 @@ serve(async (req) => {
             throw new Error("Failed to fetch financial summary: " + (rpcError?.message || "No data"))
         }
 
-        // 2. Prepare Payload for PDFMonkey
-        // We format amounts for display
+        // 2. Fetch Daily Tier Sales if available
+        const { data: dailySales } = await supabase.rpc('get_daily_tier_sales', {
+            p_organizer_id: organizer_id,
+            p_event_id: event_id,
+            p_start_date: start_date || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+            p_end_date: end_date || new Date().toISOString()
+        })
+
+        // 3. Prepare Payload for PDFMonkey
         const payload = {
             template_id: PDF_MONKEY_FINANCE_TEMPLATE_ID,
             document: {
@@ -61,6 +68,8 @@ serve(async (req) => {
                 payload: {
                     organizer_name: summary.metadata.organizer_name,
                     organizer_tier: summary.metadata.organizer_tier,
+                    report_type: export_type.toUpperCase(),
+                    event_title: event_id ? (dailySales?.[0]?.event_title || 'Specified Event') : 'Consolidated Portfolio',
                     period_start: new Date(summary.metadata.period_start).toLocaleDateString('en-ZA'),
                     period_end: new Date(summary.metadata.period_end).toLocaleDateString('en-ZA'),
                     generated_at: new Date(summary.metadata.generated_at).toLocaleString('en-ZA'),
@@ -74,6 +83,15 @@ serve(async (req) => {
                     closing_balance: summary.metrics.closing_balance.toFixed(2),
                     net_change: summary.metrics.net_change.toFixed(2),
 
+                    // Daily Grouped Sales (Requested Logic)
+                    daily_sales: (dailySales || []).map((ds: any) => ({
+                        date: new Date(ds.sale_date).toLocaleDateString('en-ZA'),
+                        tier: ds.tier_name,
+                        qty: ds.quantity_sold,
+                        total: ds.total_amount.toFixed(2)
+                    })),
+
+                    // Ledger Transactions (Simplified list)
                     transactions: (summary.transactions || []).map((tx: any) => ({
                         date: new Date(tx.created_at).toLocaleDateString('en-ZA'),
                         description: tx.description,
@@ -82,7 +100,6 @@ serve(async (req) => {
                         type: tx.type
                     })),
 
-                    // Authorized Stamp via Base64
                     stamp_url: AUTHORIZED_STAMP_B64
                 }
             }

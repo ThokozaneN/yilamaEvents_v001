@@ -72,6 +72,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
   const [isRequestingPayout, setIsRequestingPayout] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState<string>('');
   const [isLoadingFinance, setIsLoadingFinance] = useState(false);
+  const [statementConfig, setStatementConfig] = useState<{ type: 'mixed' | 'event', eventId: string | null }>({ type: 'mixed', eventId: null });
 
   const dashboardRef = useRef<HTMLDivElement>(null);
 
@@ -161,7 +162,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
 
       // Load plan/usage limits
       const { data: usageData } = await supabase
-        .rpc('check_organizer_limits', { org_id: user.id });
+        .rpc('check_organizer_limits_v2', { org_id: user.id });
       if (usageData) setUsage(usageData);
 
       // Load analytics views using the new secure RPCs
@@ -295,9 +296,13 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
     if (!user) return;
     setIsStatementGenerating(true);
     try {
-      // In a real app, we'd pass dates. Defaulting to last 30 days.
+      // Pass export config (daily grouping is handled inside EF via get_daily_tier_sales)
       const { data, error } = await supabase.functions.invoke('generate-finance-statement', {
-        body: { organizer_id: user.id }
+        body: {
+          organizer_id: user.id,
+          export_type: statementConfig.type,
+          event_id: statementConfig.eventId
+        }
       });
       if (error) throw error;
       if (data?.url) {
@@ -625,14 +630,18 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
                     </div>
                     {usage && (usage.events_limit > 0) && (
                       <span className="text-[9px] font-black uppercase tracking-widest opacity-40 themed-text">
-                        {Math.round((usage.events_current / usage.events_limit) * 100)}% Cap
+                        {Math.round(((usage.events_current || 0) / usage.events_limit) * 100)}% Cap
                       </span>
                     )}
                   </div>
                   <div className="space-y-1 relative z-10">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40 themed-text">Live Productions</p>
                     <h4 className="text-3xl font-black themed-text tracking-tight">
-                      {events.filter(e => e.status === 'published').length}
+                      {events.filter(e => {
+                        const now = new Date();
+                        const end = e.ends_at ? new Date(e.ends_at) : new Date(new Date(e.starts_at).getTime() + 6 * 60 * 60 * 1000);
+                        return e.status === 'published' && end >= now;
+                      }).length}
                     </h4>
                   </div>
                 </div>
@@ -941,14 +950,14 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                         </div>
                         <div>
-                          <p className="text-xl font-black themed-text leading-none">+{perf.velocity_24h}</p>
+                          <p className="text-xl font-black themed-text leading-none">+{perf.velocity_24h || 0}</p>
                           <p className="text-[9px] font-black uppercase tracking-widest opacity-30 themed-text">Tickets / 24h</p>
                         </div>
                       </div>
                       <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-orange-500 h-full rounded-full" style={{ width: `${perf.sell_through_rate}% ` }} />
+                        <div className="bg-orange-500 h-full rounded-full" style={{ width: `${perf.sell_through_rate || 0}% ` }} />
                       </div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-right opacity-40 themed-text">{Math.round(perf.sell_through_rate)}% Sold</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-right opacity-40 themed-text">{Math.round(perf.sell_through_rate || 0)}% Sold</p>
                     </div>
                   ))}
                   {analyticsData.performance.length === 0 && (
@@ -971,18 +980,56 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
               <h2 className="text-3xl font-black uppercase tracking-tight themed-text">Finance Central</h2>
               <p className="text-sm font-bold opacity-40 uppercase tracking-widest themed-text">Balances, settlements and statements</p>
             </div>
-            <button
-              onClick={handleDownloadStatement}
-              disabled={isStatementGenerating || !financialSummary}
-              className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-3 disabled:opacity-50"
-            >
-              {isStatementGenerating ? (
-                <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              )}
-              Download Statement
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-2xl border themed-border">
+                <button
+                  onClick={() => setStatementConfig({ type: 'mixed', eventId: null })}
+                  className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${statementConfig.type === 'mixed' ? 'bg-black dark:bg-white text-white dark:text-black shadow-md' : 'themed-text opacity-40 hover:opacity-100'}`}
+                >
+                  Mixed Statement
+                </button>
+                <div className="relative group">
+                  <select
+                    value={statementConfig.eventId || ''}
+                    onChange={(e) => setStatementConfig({ type: 'event', eventId: e.target.value })}
+                    className={`appearance-none bg-transparent px-4 py-2 pr-8 rounded-xl text-[9px] font-black uppercase tracking-widest outline-none cursor-pointer ${statementConfig.type === 'event' ? 'bg-black dark:bg-white text-white dark:text-black shadow-md' : 'themed-text opacity-40 hover:opacity-100'}`}
+                  >
+                    <option value="" disabled>By Event</option>
+                    {events.map((e) => {
+                      const now = new Date();
+                      const end = e.ends_at ? new Date(e.ends_at) : new Date(new Date(e.starts_at).getTime() + 6 * 60 * 60 * 1000);
+                      const isPast = end < now;
+                      return (
+                        <option
+                          key={e.id}
+                          value={e.id}
+                          disabled={!isPast}
+                          className="bg-white dark:bg-zinc-900 text-black dark:text-white"
+                        >
+                          {e.title} {!isPast ? ' (Active)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDownloadStatement}
+                disabled={isStatementGenerating || !financialSummary || (statementConfig.type === 'event' && !statementConfig.eventId)}
+                className="px-8 py-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-3 disabled:opacity-50"
+              >
+                {isStatementGenerating ? (
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                )}
+                Download {statementConfig.type === 'event' ? 'Event' : 'Mixed'} Statement
+              </button>
+            </div>
           </div>
 
           {!financialSummary && isLoadingFinance ? (
