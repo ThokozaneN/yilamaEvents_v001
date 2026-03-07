@@ -27,7 +27,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
   const [events, setEvents] = useState<Event[]>(initialEvents || []);
   const [eventViewTab, setEventViewTab] = useState<'active' | 'past'>('active');
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets || []);
-  const [activeTab, setActiveTab] = useState<'events' | 'analytics' | 'finance' | 'team' | 'identity'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'orders' | 'analytics' | 'finance' | 'team' | 'identity'>('events');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [venueBuilderEventId, setVenueBuilderEventId] = useState<string | null>(null);
@@ -74,6 +74,14 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
   const [isLoadingFinance, setIsLoadingFinance] = useState(false);
   const [statementConfig, setStatementConfig] = useState<{ type: 'mixed' | 'event', eventId: string | null }>({ type: 'mixed', eventId: null });
 
+  // Orders Tab State
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [selectedEventForOrders, setSelectedEventForOrders] = useState<string | null>(null);
+  const [refundingOrder, setRefundingOrder] = useState<any | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [isRefunding, setIsRefunding] = useState(false);
+
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +106,10 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
     if (activeTab === 'team' && selectedEventForTeam) {
       loadTeamScanners();
     }
-  }, [activeTab, selectedEventForTeam]);
+    if (activeTab === 'orders') {
+      loadOrders();
+    }
+  }, [activeTab, selectedEventForTeam, selectedEventForOrders]);
 
   useEffect(() => {
     // If we finished loading readiness and they are not verified, lock them out of other tabs
@@ -437,6 +448,57 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
     }
   }
 
+  async function loadOrders() {
+    setIsLoadingOrders(true);
+    try {
+      const { data, error } = await supabase.rpc('get_organizer_orders', {
+        p_event_id: selectedEventForOrders
+      });
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err: any) {
+      console.error('Error loading orders:', err);
+      setAiMessage({ text: 'Failed to load orders: ' + err.message, type: 'error' });
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  }
+
+  async function handleRefundOrder() {
+    if (!refundingOrder) return;
+    setIsRefunding(true);
+    try {
+      console.log('[REFUND] Initiating refund for order:', refundingOrder.order_id);
+
+      const { data, error } = await supabase.functions.invoke('process-refund', {
+        body: {
+          order_id: refundingOrder.order_id,
+          reason: refundReason
+        }
+      });
+
+      if (error) {
+        console.error('[REFUND] Function invocation error:', error);
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('[REFUND] Function returned logical error:', data.error);
+        throw new Error(data.error);
+      }
+
+      setAiMessage({ text: 'Refund processed successfully!', type: 'success' });
+      setRefundingOrder(null);
+      setRefundReason('');
+      loadOrders(); // Refresh list
+    } catch (err: any) {
+      console.error('[REFUND] Final error:', err);
+      setAiMessage({ text: err.message || 'Refund failed', type: 'error' });
+    } finally {
+      setIsRefunding(false);
+    }
+  }
+
   // Calculate total revenue safely
   const totalRevenue = events.reduce((acc, e) => acc + getEventRevenue(e), 0);
 
@@ -492,7 +554,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
 
         {/* Navigation Tabs */}
         <div className="flex flex-wrap justify-center md:justify-start items-center gap-1.5 sm:gap-2 p-1.5 themed-secondary-bg rounded-full border themed-border w-full md:w-max relative z-10">
-          {['events', 'analytics', 'finance', 'team', 'identity'].map((tab) => {
+          {['events', 'orders', 'analytics', 'finance', 'team', 'identity'].map((tab) => {
             const isLocked = tab !== 'identity' && readiness !== null && !readiness.ready;
             return (
               <button
@@ -837,6 +899,110 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'orders' && readiness?.ready && (
+        <div className="space-y-12 dash-stagger animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-black uppercase tracking-tight themed-text">Order Management</h2>
+              <p className="text-sm font-bold opacity-40 uppercase tracking-widest themed-text">Manage ticket sales and process refunds</p>
+            </div>
+
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              <select
+                value={selectedEventForOrders || ''}
+                onChange={(e) => setSelectedEventForOrders(e.target.value || null)}
+                className="flex-1 sm:flex-none bg-zinc-100 dark:bg-white/5 border themed-border px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none transition-all focus:border-black dark:focus:border-white"
+              >
+                <option value="">All Events</option>
+                {events.map(e => (
+                  <option key={e.id} value={e.id}>{e.title}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={loadOrders}
+                disabled={isLoadingOrders}
+                className="p-2 rounded-xl border themed-border hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 themed-text ${isLoadingOrders ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="themed-card border themed-border rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b themed-border bg-zinc-50/50 dark:bg-white/5">
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text">Date</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text">Event</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text">Buyer</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text">Tickets</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text text-right">Amount</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text text-center">Status</th>
+                    <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest opacity-40 themed-text text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y themed-border">
+                  {isLoadingOrders ? (
+                    <tr>
+                      <td colSpan={7} className="py-20 text-center">
+                        <div className="inline-block w-6 h-6 border-2 border-zinc-300 dark:border-zinc-700 border-t-black dark:border-t-white rounded-full animate-spin"></div>
+                      </td>
+                    </tr>
+                  ) : orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-20 text-center text-sm font-bold opacity-30 themed-text uppercase tracking-widest">No orders found.</td>
+                    </tr>
+                  ) : (
+                    orders.map((order) => (
+                      <tr key={order.order_id} className="hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
+                        <td className="py-4 px-6 text-[10px] font-bold themed-text opacity-60 whitespace-nowrap">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-xs font-black themed-text truncate block max-w-[150px]">{order.event_title}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold themed-text">{order.buyer_name || 'Anonymous'}</span>
+                            <span className="text-[9px] opacity-40 themed-text">{order.buyer_email}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-xs font-bold themed-text">
+                          {order.ticket_count}x
+                        </td>
+                        <td className="py-4 px-6 text-right font-black text-xs themed-text">
+                          R {Number(order.total_amount).toLocaleString()}
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <span className={`px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${order.status === 'paid' ? 'bg-green-500/10 text-green-600' :
+                            order.status === 'refunded' ? 'bg-orange-500/10 text-orange-600' :
+                              'bg-zinc-100 text-zinc-500'
+                            }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          {order.status === 'paid' && (
+                            <button
+                              onClick={() => setRefundingOrder(order)}
+                              className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                            >
+                              Refund
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1503,6 +1669,58 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = (props) => 
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
       />
+      {/* Refund Confirmation Modal */}
+      {refundingOrder && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="themed-card border themed-border rounded-[2.5rem] w-full max-w-lg p-8 space-y-8 shadow-2xl relative overflow-hidden text-left">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-[40px] -mr-16 -mt-16 pointer-events-none" />
+
+            <div className="space-y-4 text-center">
+              <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto text-red-500">
+                <AlertCircle className="w-10 h-10" />
+              </div>
+              <h3 className="text-3xl font-black uppercase tracking-tight themed-text">Process Refund?</h3>
+              <p className="text-sm font-bold text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                You are about to refund <span className="text-black dark:text-white">R {Number(refundingOrder.total_amount).toLocaleString()}</span> to <span className="text-black dark:text-white">{refundingOrder.buyer_name || 'the buyer'}</span>. This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase tracking-widest opacity-40 themed-text ml-4 text-left block">Reason for Refund (Optional)</label>
+              <textarea
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="e.g. Event cancellation, customer request..."
+                className="w-full bg-zinc-100 dark:bg-white/5 border themed-border p-5 rounded-3xl text-sm font-bold outline-none focus:border-red-500/50 transition-all resize-none h-24 themed-text"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+              <button
+                onClick={() => { setRefundingOrder(null); setRefundReason(''); }}
+                disabled={isRefunding}
+                className="flex-1 py-5 rounded-3xl border themed-border text-[10px] font-black uppercase tracking-widest themed-text hover:bg-zinc-100 dark:hover:bg-white/5 transition-all active:scale-95 disabled:opacity-30"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRefundOrder}
+                disabled={isRefunding}
+                className="flex-1 py-5 bg-red-500 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {isRefunding ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm Refund'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

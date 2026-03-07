@@ -223,6 +223,26 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
     }
   };
 
+  const handleCancelSubscription = async () => {
+    if (!user) return;
+    if (!confirm('Are you sure you want to cancel your subscription? You will lose Pro/Premium features at the end of your current billing period.')) return;
+
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase.rpc('cancel_active_subscription');
+      if (error) throw error;
+
+      alert('Subscription cancelled successfully. Your plan will remain active until the end of the current period.');
+
+      // Optionally refresh profile if we had a cancel_at_period_end field in the Profile type
+      // For now, it's enough to inform the user and they'll see the effect in the DB.
+    } catch (err: any) {
+      alert('Cancellation failed: ' + err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -803,7 +823,16 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
                         </ul>
                       </div>
                       {user?.organizer_tier === 'pro' ? (
-                        <div className="w-full py-4 bg-purple-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest text-center shadow-lg shadow-purple-500/30">Current Plan</div>
+                        <div className="space-y-3">
+                          <div className="w-full py-4 bg-purple-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest text-center shadow-lg shadow-purple-500/30">Current Plan</div>
+                          <button
+                            onClick={handleCancelSubscription}
+                            disabled={isUpdating}
+                            className="w-full py-3 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-full font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            Cancel Subscription
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleUpgradeTier('pro')}
@@ -834,7 +863,16 @@ export const SettingsView: React.FC<SettingsProps> = ({ user, onLogout, theme, o
                         </ul>
                       </div>
                       {user?.organizer_tier === 'premium' ? (
-                        <div className="w-full py-4 bg-amber-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest text-center shadow-lg shadow-amber-500/30">Current Plan</div>
+                        <div className="space-y-3">
+                          <div className="w-full py-4 bg-amber-500 text-white rounded-full font-black text-[10px] uppercase tracking-widest text-center shadow-lg shadow-amber-500/30">Current Plan</div>
+                          <button
+                            onClick={handleCancelSubscription}
+                            disabled={isUpdating}
+                            className="w-full py-3 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-full font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            Cancel Subscription
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleUpgradeTier('premium')}
