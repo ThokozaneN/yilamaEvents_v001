@@ -37,11 +37,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
             form.method = 'POST';
             form.action = url;
 
-            Object.keys(pfParams).forEach(key => {
+            // pfParams is now an array of { name, value } objects to preserve order
+            pfParams.forEach(({ name, value }: { name: string, value: string }) => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
-                input.name = key;
-                input.value = pfParams[key];
+                input.name = name;
+                input.value = value;
                 form.appendChild(input);
             });
 

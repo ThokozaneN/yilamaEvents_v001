@@ -206,14 +206,20 @@ serve(async (req) => {
       .join('&') + (currentPassphrase ? `&passphrase=${pfEncode(currentPassphrase.trim())}` : '');
 
     const signature = md5(signatureBase);
-    const finalData = { ...payfastData, signature };
+
+    // Return parameters as an ORGANIZED ARRAY to ensure the frontend 
+    // preserves the exact order required for signature verification.
+    const orderedParams = [
+      ...Object.entries(payfastData).map(([name, value]) => ({ name, value })),
+      { name: 'signature', value: signature }
+    ];
 
     const checkoutUrl = isProduction
       ? 'https://www.payfast.co.za/eng/process'
       : 'https://sandbox.payfast.co.za/eng/process';
 
     return new Response(
-      JSON.stringify({ url: checkoutUrl, params: finalData }),
+      JSON.stringify({ url: checkoutUrl, params: orderedParams }),
       { headers: { ...headers, 'Content-Type': 'application/json' } }
     );
 
