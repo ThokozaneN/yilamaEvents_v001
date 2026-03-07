@@ -205,42 +205,52 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
   return (
     <div className="px-6 md:px-12 py-12 max-w-7xl mx-auto space-y-20 animate-in fade-in duration-1000">
       {isCheckoutOpen && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 apple-blur overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/95 apple-blur overflow-y-auto outline-none">
           {/* P-7.4: CSS animation replaces GSAP - defined as checkout-in keyframes in index.css */}
-          <div className="checkout-pane themed-card w-full max-w-xl rounded-[2.5rem] sm:rounded-[4rem] border themed-border shadow-2xl p-6 sm:p-10 md:p-16 space-y-8 sm:space-y-12 relative overflow-hidden" style={{ animation: 'checkout-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+          <div className="checkout-pane themed-card w-full max-w-xl rounded-[2.5rem] sm:rounded-[4rem] border themed-border shadow-2xl p-6 sm:p-10 md:p-14 space-y-6 sm:space-y-10 relative my-auto" style={{ animation: 'checkout-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+
+            {/* Close Button - Responsive & Accessible */}
+            <button
+              onClick={() => { setIsCheckoutOpen(false); setShowPromo(false); setPromoCode(''); }}
+              className="absolute top-6 right-6 sm:top-8 sm:right-8 w-10 h-10 sm:w-12 sm:h-12 rounded-full themed-secondary-bg border themed-border flex items-center justify-center themed-text hover:bg-red-500 hover:text-white dark:hover:bg-red-500 transition-all z-[10]"
+              aria-label="Close Checkout"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
             <div className="absolute top-0 right-0 w-64 h-64 bg-zinc-500/5 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none" />
 
             {/* U-8.1: Clear, human-readable heading */}
-            <div className="space-y-1 relative z-10">
+            <div className="space-y-1 relative z-10 pr-12">
               <h2 className="text-2xl sm:text-4xl font-black uppercase tracking-tight themed-text">Order Summary</h2>
-              <p className="text-[10px] font-medium themed-text opacity-40">{event.title}</p>
+              <p className="text-[10px] font-medium themed-text opacity-40 truncate">{event.title}</p>
             </div>
 
             {/* Order details */}
-            <div className="themed-secondary-bg rounded-[3rem] p-10 space-y-6 shadow-inner border themed-border relative z-10">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">Ticket Type</span>
-                <span className="text-lg font-black themed-text uppercase">{selectedTier?.name}</span>
+            <div className="themed-secondary-bg rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 space-y-4 sm:space-y-6 shadow-inner border themed-border relative z-10">
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-[10px] font-black opacity-30 uppercase tracking-widest shrink-0">Ticket Type</span>
+                <span className="text-sm sm:text-lg font-black themed-text uppercase truncate text-right">{selectedTier?.name}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">Quantity</span>
-                <span className="text-lg font-black themed-text">× {qty}</span>
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-[10px] font-black opacity-30 uppercase tracking-widest shrink-0">Quantity</span>
+                <span className="text-sm sm:text-lg font-black themed-text">× {qty}</span>
               </div>
-              <div className="pt-8 border-t themed-border flex justify-between items-end">
+              <div className="pt-6 sm:pt-8 border-t themed-border flex justify-between items-end gap-4">
                 <div className="space-y-1">
                   <span className="text-[10px] font-black uppercase tracking-widest opacity-30">Total</span>
-                  <p className="text-4xl font-black themed-text tracking-tighter leading-none">R{totalPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-2xl sm:text-4xl font-black themed-text tracking-tighter leading-none">R{totalPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
                 </div>
                 {/* U-8.5: Trust signal — secure checkout badge */}
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20">
+                <div className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-green-500/10 border border-green-500/20">
                   <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  <span className="text-[9px] font-black text-green-500 uppercase tracking-widest">Secure</span>
+                  <span className="text-[8px] sm:text-[9px] font-black text-green-500 uppercase tracking-widest">Secure</span>
                 </div>
               </div>
 
               {/* U-8.4: Fee transparency */}
-              <p className="text-[9px] font-medium opacity-40 text-center pt-2">
-                Prices are inclusive of all booking fees. Secure payment via PayFast.
+              <p className="text-[8px] sm:text-[9px] font-medium opacity-40 text-center pt-2">
+                Prices inclusive of booking fees. Secure payment via PayFast.
               </p>
             </div>
 
@@ -260,54 +270,50 @@ export const EventDetailView: React.FC<EventDetailProps> = ({ event, user, onNav
                   value={promoCode}
                   onChange={e => setPromoCode(e.target.value.toUpperCase())}
                   placeholder="Enter promo code"
-                  className="w-full px-5 py-3 rounded-2xl themed-secondary-bg border themed-border text-sm font-bold themed-text uppercase tracking-widest placeholder-opacity-30 outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
+                  className="w-full px-5 py-3 rounded-2xl themed-secondary-bg border themed-border text-xs sm:text-sm font-bold themed-text uppercase tracking-widest placeholder-opacity-30 outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-all"
                 />
               )}
             </div>
 
             {/* Payment Environment Toggle */}
-            <div className="relative z-10 p-5 rounded-3xl themed-secondary-bg border themed-border border-dashed flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Payment Mode</span>
-                <p className="text-xs font-bold themed-text uppercase">{isTestMode ? 'Sandbox (Test)' : 'Real Payment (Live)'}</p>
+            <div className="relative z-10 p-4 sm:p-5 rounded-3xl themed-secondary-bg border themed-border border-dashed flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <span className="text-[9px] font-black uppercase tracking-widest opacity-40 leading-none">Status</span>
+                <p className="text-[10px] sm:text-xs font-bold themed-text uppercase">{isTestMode ? 'Sandbox' : 'Live Mode'}</p>
               </div>
               <button
                 onClick={() => setIsTestMode(!isTestMode)}
-                className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${isTestMode ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'}`}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest transition-all ${isTestMode ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'}`}
               >
-                Switch to {isTestMode ? 'Live' : 'Sandbox'}
+                Use {isTestMode ? 'Live' : 'Sandbox'}
               </button>
             </div>
 
-            <div className="space-y-3 relative z-10">
+            <div className="space-y-4 relative z-10">
               <button
                 onClick={handleFinalPurchase}
                 disabled={isProcessing}
-                className="w-full py-7 bg-black dark:bg-white text-white dark:text-black rounded-[2.5rem] font-black text-sm uppercase tracking-[0.3em] shadow-2xl flex items-center justify-center gap-4 active:scale-95 transition-all disabled:opacity-60"
+                className="w-full py-6 sm:py-7 bg-black dark:bg-white text-white dark:text-black rounded-[2rem] sm:rounded-[2.5rem] font-black text-xs sm:text-sm uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-2xl flex items-center justify-center gap-3 sm:gap-4 active:scale-95 transition-all disabled:opacity-60"
               >
-                {isProcessing ? <div className="w-6 h-6 border-3 border-current border-t-transparent rounded-full animate-spin" /> : (
+                {isProcessing ? <div className="w-5 h-5 sm:w-6 sm:h-6 border-3 border-current border-t-transparent rounded-full animate-spin" /> : (
                   <>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                    <span>Pay with PayFast</span>
+                    <span>Checkout — R{totalPrice}</span>
                   </>
                 )}
               </button>
-              {/* U-8.5: PayFast trust indicators */}
-              <div className="flex flex-col items-center gap-4 opacity-40">
-                <div className="flex flex-wrap justify-center gap-2">
-                  {['Visa', 'Mastercard', 'Amex', 'Apple Pay', 'Samsung Pay'].map(m => (
-                    <span key={m} className="px-2 py-1 border themed-border rounded text-[8px] font-black uppercase tracking-widest whitespace-nowrap">{m}</span>
+
+              <div className="flex flex-col items-center gap-4 opacity-40 px-2 text-center">
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {['Visa', 'Mastercard', 'Amex', 'Apple Pay'].map(m => (
+                    <span key={m} className="px-1.5 py-0.5 border themed-border rounded text-[7px] font-black uppercase tracking-widest whitespace-nowrap">{m}</span>
                   ))}
                 </div>
-                <div className="flex items-center justify-center gap-2">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                  <span className="text-[9px] font-bold uppercase tracking-widest">Securely Processed via PayFast · 256-bit SSL</span>
+                <div className="flex items-center justify-center gap-1.5 leading-tight">
+                  <svg className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                  <span className="text-[8px] font-bold uppercase tracking-widest">Secure 256-bit SSL Payment</span>
                 </div>
               </div>
-              <button
-                onClick={() => { setIsCheckoutOpen(false); setShowPromo(false); setPromoCode(''); }}
-                className="w-full py-3 text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-70 transition-all"
-              >Go Back</button>
             </div>
           </div>
         </div>, document.body
