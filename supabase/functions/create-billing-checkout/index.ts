@@ -130,18 +130,19 @@ serve(async (req) => {
     }
 
     const prices: Record<string, number> = { pro: 79.00, premium: 119.00 };
-    const amount = prices[tier];
+    const tierName = tier?.toString().toLowerCase();
+    const amount = prices[tierName];
     if (!amount) throw new Error('INVALID_TIER');
 
     const now = new Date();
     const periodEnd = new Date(now);
-    periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    periodEnd.setMonth(periodEnd.getMonth() + 1); // Monthly billing
 
     const { data: sub, error: subErr } = await supabase
       .from('subscriptions')
       .insert({
         user_id: user.id,
-        plan_id: tier,
+        plan_id: tierName,
         status: 'pending_verification',
         current_period_start: now.toISOString(),
         current_period_end: periodEnd.toISOString(),
@@ -163,50 +164,56 @@ serve(async (req) => {
       });
     if (payErr) throw payErr;
 
-    const origin = reqOrigin || PRODUCTION_ORIGIN;
-    const nameParts = (profile.name || 'Organizer').split(' ');
+    const origin = getAllowedOrigin(reqOrigin);
+    const isSandbox = Deno.env.get('PAYFAST_ENVIRONMENT') === 'sandbox';
+    const currentPassphrase = isSandbox
+      ? Deno.env.get('PAYFAST_SANDBOX_PASSPHRASE')
+      : Deno.env.get('PAYFAST_PASSPHRASE');
 
-    const pfData: Record<string, string> = {
-      merchant_id: merchantId!,
-      merchant_key: merchantKey!,
-      return_url: `${origin}/organizer?billing=success`,
-      cancel_url: `${origin}/organizer?billing=cancel`,
-      notify_url: `${supabaseUrl}/functions/v1/payfast-itn`,
-      name_first: nameParts[0],
-      name_last: nameParts.slice(1).join(' ') || '',
+    // M-10.2: PayFast Signature requires specific field ordering.
+    // Fields must be added to the signature BASE in the order they appear in PayFast documentation.
+    const payfastData: Record<string, string> = {
+      merchant_id: isSandbox ? '10000100' : (Deno.env.get('PAYFAST_MERCHANT_ID') || ''),
+      merchant_key: isSandbox ? '46f0cd694581a' : (Deno.env.get('PAYFAST_MERCHANT_KEY') || ''),
+      return_url: `${origin}/dashboard?view=finance&status=success`,
+      cancel_url: `${origin}/dashboard?view=finance&status=cancelled`,
+      notify_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/payfast-itn`,
+
+      name_first: profile.name?.split(' ')[0] || 'User',
+      name_last: profile.name?.split(' ').slice(1).join(' ') || 'Yilama',
       email_address: profile.email || '',
+
       m_payment_id: mPaymentId,
       amount: amount.toFixed(2),
-      item_name: `Yilama - ${tier.toUpperCase()} Plan`,
+      item_name: `Yilama Events: ${tierName.toUpperCase()} Plan`,
+
+      // Subscription parameters
+      subscription_type: '1',
+      billing_date: now.toISOString().split('T')[0],
+      recurring_amount: amount.toFixed(2),
+      frequency: '3', // Monthly
+      cycles: '0'     // Indefinite
     };
 
-    // Add optional payment method override (e.g., 'cc', 'ap', 'sp')
-    if (paymentMethod) {
-      pfData.payment_method = paymentMethod;
-    }
-
-    Object.keys(pfData).forEach(k => {
-      if (!pfData[k] || pfData[k].trim() === '') delete pfData[k];
-    });
-
+    // Special Payfast URL encoding
     const pfEncode = (val: string) =>
       encodeURIComponent(val).replace(/%20/g, '+').replace(/!/g, '%21').replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\*/g, '%2A');
 
-    let pfOutput = '';
-    Object.keys(pfData).forEach((key) => {
-      if (pfData[key] !== '') pfOutput += `${key}=${pfEncode(pfData[key].trim())}&`;
-    });
+    // Build signature base string (strictly following documentation order)
+    const signatureBase = Object.entries(payfastData)
+      .filter(([_, v]) => v !== '')
+      .map(([k, v]) => `${k}=${pfEncode(v.trim())}`)
+      .join('&') + (currentPassphrase ? `&passphrase=${pfEncode(currentPassphrase.trim())}` : '');
 
-    let signatureBase = pfOutput.slice(0, -1);
-    signatureBase += `&passphrase=${pfEncode(passphrase!.trim())}`;
-    pfData.signature = md5(signatureBase);
+    const signature = md5(signatureBase);
+    const finalData = { ...payfastData, signature };
 
     const checkoutUrl = isProduction
       ? 'https://www.payfast.co.za/eng/process'
       : 'https://sandbox.payfast.co.za/eng/process';
 
     return new Response(
-      JSON.stringify({ url: checkoutUrl, params: pfData }),
+      JSON.stringify({ url: checkoutUrl, params: finalData }),
       { headers: { ...headers, 'Content-Type': 'application/json' } }
     );
 

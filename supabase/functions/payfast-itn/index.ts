@@ -269,6 +269,7 @@ serve(async (req) => {
     } else {
       // ── Subscription Payment ──
       const paymentStatus = isComplete ? 'confirmed' : 'failed';
+      const token = data.token; // PayFast Subscription Token
 
       const { error } = await supabase.rpc('finalize_billing_payment', {
         p_provider_ref: mPaymentId || pfPaymentId,
@@ -277,10 +278,11 @@ serve(async (req) => {
           payfast_response: data,
           environment: isProduction ? 'production' : 'sandbox',
         },
+        p_token: token || null
       });
 
       if (error) throw error;
-      console.log(`[PAYFAST_ITN] Subscription payment ${paymentStatus}`);
+      console.log(`[PAYFAST_ITN] Subscription payment ${paymentStatus} (token: ${token || 'none'})`);
     }
 
     return new Response('OK', { status: 200 });
