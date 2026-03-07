@@ -3,6 +3,7 @@
 -- =============================================================================
 
 -- RPC to get daily sales grouped by tier for a specific event or mixed
+DROP FUNCTION IF EXISTS get_daily_tier_sales(uuid, uuid, timestamptz, timestamptz);
 CREATE OR REPLACE FUNCTION get_daily_tier_sales(
     p_organizer_id uuid,
     p_event_id uuid DEFAULT NULL,
@@ -39,6 +40,7 @@ END;
 $$;
 
 -- Refined check_organizer_limits to use the correct keys for the frontend
+DROP FUNCTION IF EXISTS check_organizer_limits_v2(uuid);
 CREATE OR REPLACE FUNCTION check_organizer_limits_v2(org_id uuid DEFAULT auth.uid())
 RETURNS jsonb AS $$
 DECLARE
@@ -91,6 +93,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Update get_ticket_performance to include 24h velocity
+DROP FUNCTION IF EXISTS get_ticket_performance();
 CREATE OR REPLACE FUNCTION get_ticket_performance()
 RETURNS TABLE (
     tier_id uuid,
