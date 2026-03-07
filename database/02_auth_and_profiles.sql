@@ -227,18 +227,30 @@ create policy "Admins can manage applications"
 create or replace function check_profile_updates()
 returns trigger as $$
 begin
-    -- If user is NOT admin, prevent changing sensitive fields
+    -- 1. Allow bypass for the backend service role, postgres admin, or supabase admin
+    if current_user in ('service_role', 'postgres', 'supabase_admin') then
+        return new;
+    end if;
+
+    -- 2. If user is NOT an admin, prevent changing sensitive fields
     if not is_admin() then
+        -- Prevent role change
         if new.role is distinct from old.role then
             raise exception 'You cannot change your own role.';
         end if;
-        if new.verification_status is distinct from old.verification_status then
-            raise exception 'You cannot change your own verification status.';
+        
+        -- Prevent verification status change (must be done by admin or backend)
+        if (new.verification_status is distinct from old.verification_status) 
+           or (new.organizer_status is distinct from old.organizer_status) then
+            raise exception 'You cannot change your own verification or organizer status.';
         end if;
-         if new.organizer_status is distinct from old.organizer_status then
-            raise exception 'You cannot change your own organizer status.';
+        
+        -- Prevent tier changes (must be done via paid flow/backend)
+        if new.organizer_tier is distinct from old.organizer_tier then
+            raise exception 'You cannot change your own organizer tier.';
         end if;
     end if;
+    
     return new;
 end;
 $$ language plpgsql;
