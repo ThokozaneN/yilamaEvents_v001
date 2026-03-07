@@ -18,6 +18,9 @@
 do $$ 
 begin
     -- Contact & Socials
+    if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'name') then
+        alter table profiles add column name text;
+    end if;
     if not exists (select 1 from information_schema.columns where table_name = 'profiles' and column_name = 'phone') then
         alter table profiles add column phone text;
     end if;
@@ -112,40 +115,65 @@ create table if not exists organizer_applications (
 -- 3. Triggers for Automation
 
 -- A. Auto-create Profile on Auth Signup
--- This function runs securely with definer privileges
+-- This function runs securely with definer privileges and is hardened against failures
 create or replace function public.handle_new_user() 
 returns trigger as $$
 declare
-  is_organizer boolean;
-  final_role user_role;
+  v_role_text text;
+  v_role_enum public.user_role;
 begin
-  -- Resolve role from metadata (frontend sends 'user' or 'organizer')
-  is_organizer := (new.raw_user_meta_data->>'role' = 'organizer');
-  final_role := case when is_organizer then 'organizer'::user_role else 'attendee'::user_role end;
+  -- 1. Extract and Validate Role from metadata
+  v_role_text := coalesce(new.raw_user_meta_data->>'role', 'attendee');
+  
+  -- Handle 'user' -> 'attendee' mapping for flexibility
+  if v_role_text = 'user' then 
+    v_role_text := 'attendee'; 
+  end if;
 
-  insert into public.profiles (
-    id, 
-    email, 
-    role, 
-    name,
-    business_name,
-    phone,
-    organization_phone,
-    organizer_tier
-  )
-  values (
-    new.id, 
-    new.email, 
-    final_role, 
-    coalesce(new.raw_user_meta_data->>'full_name', new.email),
-    new.raw_user_meta_data->>'business_name',
-    new.raw_user_meta_data->>'phone',
-    new.raw_user_meta_data->>'organization_phone',
-    coalesce(new.raw_user_meta_data->>'organizer_tier', 'free')
-  );
+  -- Ensure common roles are handled correctly
+  if v_role_text not in ('attendee', 'organizer', 'scanner', 'admin') then
+    v_role_text := 'attendee';
+  end if;
+
+  -- Safely cast to enum
+  begin
+    v_role_enum := v_role_text::public.user_role;
+  exception when others then
+    v_role_enum := 'attendee'::public.user_role;
+  end;
+
+  -- 2. Attempt to create profile
+  -- We wrap this in a sub-block to swallow errors, ensuring the Auth record is never blocked
+  begin
+    insert into public.profiles (
+      id, 
+      email, 
+      role, 
+      name,
+      business_name,
+      phone,
+      organization_phone,
+      organizer_tier
+    )
+    values (
+      new.id, 
+      new.email, 
+      v_role_enum, 
+      coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', new.email),
+      new.raw_user_meta_data->>'business_name',
+      new.raw_user_meta_data->>'phone',
+      case when v_role_text = 'organizer' then new.raw_user_meta_data->>'phone' else null end,
+      coalesce(new.raw_user_meta_data->>'organizer_tier', 'free')
+    );
+  exception 
+    when others then
+      -- Log failure if needed (in a real system), but return NEW to allow signup to continue
+      null;
+  end;
+
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 -- Attach to auth.users
 -- Drop first to be safe/idempotent

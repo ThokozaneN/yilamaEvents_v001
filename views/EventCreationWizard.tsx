@@ -349,7 +349,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                 type="text"
                                 value={formData.title}
                                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 rounded-[2rem] text-4xl md:text-5xl font-black text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl placeholder:opacity-20"
+                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 rounded-[2rem] text-2xl sm:text-4xl md:text-5xl font-black text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl placeholder:opacity-20"
                                 placeholder="The Next Big Thing"
                             />
                         </div>
@@ -432,7 +432,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-8 pt-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4">
                             <div className="space-y-4">
                                 <label className="text-xs font-black uppercase tracking-widest opacity-40 ml-4 text-black dark:text-white">Doors Open</label>
                                 <input
@@ -477,7 +477,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                             <textarea
                                 value={formData.description}
                                 onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 md:p-8 rounded-[2rem] text-2xl md:text-3xl font-medium text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl resize-none h-48 placeholder:opacity-20 leading-snug custom-scrollbar"
+                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 rounded-[1.5rem] sm:rounded-[2rem] text-lg sm:text-2xl md:text-3xl font-medium text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl resize-none h-48 placeholder:opacity-20 leading-snug custom-scrollbar"
                                 placeholder="Tell them a story..."
                                 autoFocus
                             />
@@ -643,7 +643,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                                     prohibitions: isSelected ? current.filter(id => id !== p.id) : [...current, p.id]
                                                 });
                                             }}
-                                            className={`px-8 py-5 rounded-[2rem] flex items-center gap-4 transition-all duration-300 ${isSelected
+                                            className={`px-6 py-4 sm:px-8 sm:py-5 rounded-[1.5rem] sm:rounded-[2rem] flex items-center gap-4 transition-all duration-300 ${isSelected
                                                 ? 'bg-black dark:bg-white text-white dark:text-black scale-105 shadow-xl'
                                                 : 'bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-black dark:hover:text-white border border-transparent hover:border-black/10 dark:hover:border-white/10'
                                                 }`}
@@ -772,7 +772,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                                 type="number"
                                 value={formData.total_ticket_limit}
                                 onChange={e => setFormData({ ...formData, total_ticket_limit: parseInt(e.target.value) || 0 })}
-                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 rounded-[2rem] text-4xl md:text-5xl font-black text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl placeholder:opacity-20"
+                                className="w-full bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-black p-6 rounded-[2rem] text-2xl sm:text-4xl md:text-5xl font-black text-black dark:text-white outline-none border border-transparent focus:border-black/20 dark:focus:border-white/20 transition-all shadow-sm focus:shadow-xl placeholder:opacity-20"
                                 placeholder="e.g. 500"
                                 disabled={formData.is_seated}
                             />
@@ -1028,7 +1028,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                             <Rocket className="w-16 h-16 text-black dark:text-white" />
                         </div>
                         <div className="space-y-6 max-w-2xl text-center">
-                            <h3 className="text-6xl md:text-7xl font-black uppercase tracking-tighter text-black dark:text-white leading-none">All Systems Go</h3>
+                            <h3 className="text-3xl sm:text-6xl md:text-7xl font-black uppercase tracking-tighter text-black dark:text-white leading-none">All Systems Go</h3>
                             <p className="text-2xl text-zinc-400 font-medium leading-relaxed">Your event is prepped for the Yilama network. Review the details and hit publish.</p>
                         </div>
 
@@ -1138,7 +1138,7 @@ export const EventCreationWizard: React.FC<EventCreationWizardProps> = ({ user, 
                 <div className="flex-1 relative bg-white dark:bg-black sm:rounded-[3rem] shadow-2xl overflow-hidden border-x border-b sm:border border-zinc-100 dark:border-zinc-800 flex flex-col h-full sm:max-h-[90vh] my-auto">
 
                     {/* Header & Progress */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 sm:p-8 md:p-10 pb-4 sm:pb-6 border-b border-zinc-100 dark:border-zinc-900 gap-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-8 md:p-10 pb-4 sm:pb-6 border-b border-zinc-100 dark:border-zinc-900 gap-4">
                         <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 custom-scrollbar hide-scrollbar">
                             {STEPS.map((step, idx) => (
                                 <div
