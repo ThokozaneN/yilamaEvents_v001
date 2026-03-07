@@ -38,17 +38,14 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentView, onNavigate, o
           <span className="text-xs sm:text-sm font-bold tracking-tight uppercase themed-text">Yilama</span>
         </div>
 
-        {/* Centered Nav Links */}
-        <nav className="hidden md:flex items-center gap-8 ml-10">
-          <button
-            onClick={() => onNavigate('about')}
-            className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all hover:opacity-100 ${currentView === 'about' ? 'themed-text opacity-100' : 'themed-text opacity-40'}`}
-          >
-            Vision
-          </button>
-        </nav>
-
         <div className="flex items-center gap-4 sm:gap-6">
+          <div className="relative group cursor-pointer" onClick={() => onNavigate('about')}>
+            <svg className={`w-5 h-5 transition-all ${currentView === 'about' ? 'themed-text opacity-100 scale-110' : 'themed-text opacity-40 hover:opacity-100 hover:scale-110'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0.5 h-0.5 bg-current rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+
           {user ? (
             <div className="flex items-center gap-4 sm:gap-5">
               <div className="relative group cursor-pointer" onClick={() => onNavigate('notifications')}>
